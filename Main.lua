@@ -1,17 +1,17 @@
 --==============================--
---  TEST 2 : INCLUDE SIMPLE
+--  TEST 3 : ESP MODULE SIMPLE
 --==============================--
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Nexus by Rizzy - TEST 2",
+    Title = "Nexus by Rizzy - TEST 3",
     Center = true,
     AutoShow = true
 })
 
 local Tab = Window:AddTab("Main")
-local Group = Tab:AddLeftGroupbox("Include Test")
+local Group = Tab:AddLeftGroupbox("ESP Test")
 
 --==============================--
 --  INCLUDE FUNCTION
@@ -20,18 +20,18 @@ local Group = Tab:AddLeftGroupbox("Include Test")
 local function include(path)
     local url = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/main/" .. path
     local content = game:HttpGet(url)
-
     return loadstring(content)()
 end
 
 --==============================--
---  TEST MODULE
+--  LOAD ESP MODULE
 --==============================--
 
-local testModule = include("Modules/Test.lua")
+local ESP = include("Modules/ESP.lua")
 
-Group:AddLabel("Module loaded: " .. tostring(testModule))
+Group:AddLabel("ESP loaded: " .. tostring(ESP))
 
-Group:AddButton("Show Value", function()
-    Library:Notify("Module says: " .. tostring(testModule.Value), 3)
+Group:AddButton("Run ESP Update", function()
+    ESP:UpdateAll()
+    Library:Notify("ESP UpdateAll() executed", 3)
 end)
