@@ -1,7 +1,7 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-local ESP = {
+local ESP = getgenv().ESP or {
     Enabled = false,
     Color = Color3.fromRGB(255, 0, 0),
     Boxes = {},
@@ -45,4 +45,5 @@ function ESP:UpdateAll()
     end
 end
 
+getgenv().ESP = ESP
 return ESP
