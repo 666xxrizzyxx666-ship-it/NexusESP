@@ -13,10 +13,15 @@ end
 
 function Box.Update(player)
     local box = getgenv().ESP.Boxes[player]
-    if not box then return end
+    if typeof(box) ~= "Drawing" then return end
 
     local char = player.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char then
+        box.Visible = false
+        return
+    end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then
         box.Visible = false
         return
@@ -28,7 +33,6 @@ function Box.Update(player)
         return
     end
 
-    -- Petit carré simple pour tester
     box.Position = Vector2.new(pos.X - 25, pos.Y - 25)
     box.Size = Vector2.new(50, 50)
     box.Visible = true
