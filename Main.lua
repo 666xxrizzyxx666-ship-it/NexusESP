@@ -34,11 +34,13 @@ local Window = Library:CreateWindow({
     AutoShow = true
 })
 
+-- Onglet VISUALS
 local Tabs = {
-    ESP = Window:AddTab("ESP")
+    Visuals = Window:AddTab("Visuals")
 }
 
-local ESPGroup = Tabs.ESP:AddLeftGroupbox("Box ESP")
+-- Sous-catégorie ESP
+local ESPGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 
 --========================================================--
 --  MODULE LOADER
@@ -59,7 +61,7 @@ include(base .. "Box.lua")
 --========================================================--
 
 ESPGroup:AddToggle("BoxToggle", {
-    Text = "Enable Box",
+    Text = "Box ESP",
     Default = true,
     Callback = function(v)
         ESP.Box = v
