@@ -15,25 +15,30 @@ local ESP = {
 function ESP:UpdateAll()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
+
+            -- BOX
             if self.Enabled then
                 if not self.Boxes[player] then
                     require(script.Parent.Box).Create(player)
                 end
                 require(script.Parent.Box).Update(player)
-
-                if self.HealthBar then
-                    if not self.HealthBars[player] then
-                        require(script.Parent.Health).Create(player)
-                    end
-                    require(script.Parent.Health).Update(player)
-                end
             else
                 if self.Boxes[player] then
                     self.Boxes[player].Visible = false
                 end
-                if self.HealthBars[player] then
-                    self.HealthBars[player].bg.Visible = false
-                    self.HealthBars[player].bar.Visible = false
+            end
+
+            -- HEALTH
+            if self.HealthBar then
+                if not self.HealthBars[player] then
+                    require(script.Parent.Health).Create(player)
+                end
+                require(script.Parent.Health).Update(player)
+            else
+                local hb = self.HealthBars[player]
+                if hb then
+                    hb.bg.Visible = false
+                    hb.bar.Visible = false
                 end
             end
         end
