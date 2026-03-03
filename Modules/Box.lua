@@ -11,9 +11,7 @@ function CreateBox(player)
     box.Color = ESP.BoxColor
     box.Visible = false
 
-    ESP.Boxes[player] = {
-        Main = box
-    }
+    ESP.Boxes[player] = { Main = box }
 end
 
 function UpdateBox(player, char)
