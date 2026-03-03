@@ -1,0 +1,64 @@
+{
+  "_comment": "RobloxESP Framework — Configuration finale d'exemple",
+  "_version": "1.0.0",
+
+  "Enabled": true,
+  "TeamCheck": true,
+  "VisibilityCheck": true,
+  "PerformanceMode": false,
+  "DebugMode": false,
+
+  "Box": {
+    "Enabled": true,
+    "Color": { "R": 255, "G": 100, "B": 100 },
+    "Thickness": 1,
+    "Filled": true,
+    "FillColor": { "R": 255, "G": 60, "B": 60 },
+    "FillTrans": 0.85
+  },
+
+  "Skeleton": {
+    "Enabled": true,
+    "Color": { "R": 255, "G": 255, "B": 255 },
+    "Thickness": 1
+  },
+
+  "Tracers": {
+    "Enabled": true,
+    "Color": { "R": 255, "G": 80, "B": 80 },
+    "Position": "Bottom",
+    "Thickness": 1
+  },
+
+  "Health": {
+    "Enabled": true,
+    "Position": "Left",
+    "Width": 3,
+    "ShowText": false,
+    "OutlineColor": { "R": 0, "G": 0, "B": 0 }
+  },
+
+  "Name": {
+    "Enabled": true,
+    "Color": { "R": 255, "G": 255, "B": 255 },
+    "Size": 13,
+    "OffsetY": 5,
+    "Outline": true
+  },
+
+  "Distance": {
+    "Enabled": true,
+    "Color": { "R": 180, "G": 180, "B": 180 },
+    "Size": 11,
+    "Format": "{dist}m",
+    "MaxDist": 500
+  },
+
+  "PlayerList": {
+    "Enabled": true,
+    "ShowDistance": true,
+    "ShowHealth": true,
+    "ShowTeam": true,
+    "ShowVisible": true
+  }
+}
