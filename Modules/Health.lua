@@ -1,4 +1,4 @@
-llocal Camera = workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
 local ESP = require(script.Parent.ESP)
 
 local Health = {}
