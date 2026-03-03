@@ -25,8 +25,8 @@ ESP = {
 --========================================================--
 
 local function include(url)
-    local source = game:HttpGet(url)
-    local fn = loadstring(source)
+    local src = game:HttpGet(url)
+    local fn = loadstring(src)
     return fn()
 end
 
