@@ -1,17 +1,17 @@
 --==============================--
---  TEST 5 : BOX MODULE SIMPLE
+--  TEST 6 : ESP + BOX CONNECTÉS
 --==============================--
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Nexus by Rizzy - TEST 5",
+    Title = "Nexus by Rizzy - TEST 6",
     Center = true,
     AutoShow = true
 })
 
 local Tab = Window:AddTab("Main")
-local Group = Tab:AddLeftGroupbox("Box Test")
+local Group = Tab:AddLeftGroupbox("ESP Test")
 
 --==============================--
 --  INCLUDE FUNCTION
@@ -30,15 +30,15 @@ end
 local ESP = include("Modules/ESP.lua")
 local Box = include("Modules/Box.lua")
 
-Group:AddLabel("ESP loaded: " .. tostring(ESP))
-Group:AddLabel("Box loaded: " .. tostring(Box))
+Group:AddToggle("EnableESP", {
+    Text = "Enable ESP",
+    Default = false,
+    Callback = function(v)
+        ESP.Enabled = v
+    end
+})
 
-Group:AddButton("Test Box.Create", function()
-    Box.Create(game.Players.LocalPlayer)
-    Library:Notify("Box.Create() executed", 3)
-end)
-
-Group:AddButton("Test Box.Update", function()
-    Box.Update(game.Players.LocalPlayer)
-    Library:Notify("Box.Update() executed", 3)
+Group:AddButton("Force UpdateAll", function()
+    ESP:UpdateAll()
+    Library:Notify("ESP UpdateAll() executed", 3)
 end)
