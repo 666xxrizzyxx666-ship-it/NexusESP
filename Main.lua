@@ -43,8 +43,7 @@ local ESPGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 --========================================================--
 
 local function include(url)
-    local src = game:HttpGet(url)
-    return loadstring(src)()
+    return loadstring(game:HttpGet(url))()
 end
 
 local base = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/main/Modules/"
