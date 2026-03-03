@@ -21,7 +21,7 @@ local MAX_LOGS     = 200
 
 function Utils.Log(msg, level)
     level = level or "INFO"
-    local entry = string.format("[%s][%s] %s", os.clock():format("%.3f"), level, msg)
+    local entry = string.format("[%.3f][%s] %s", os.clock(), level, msg)
     table.insert(logBuffer, entry)
     if #logBuffer > MAX_LOGS then
         table.remove(logBuffer, 1)
