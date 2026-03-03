@@ -11,7 +11,6 @@ function ESP:UpdateAll()
 
             if not self.Boxes[player] then
                 getgenv().Box.Create(player)
-                self.Boxes[player] = true
             end
 
             getgenv().Box.Update(player)
@@ -19,4 +18,5 @@ function ESP:UpdateAll()
     end
 end
 
+getgenv().ESP = ESP
 return ESP
