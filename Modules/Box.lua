@@ -1,11 +1,12 @@
 local Box = {}
 
 function Box.Create(player)
-    print("Box.Create() called for", player.Name)
+    print("[BOX] Create for:", player.Name)
 end
 
 function Box.Update(player)
-    print("Box.Update() called for", player.Name)
+    print("[BOX] Update for:", player.Name)
 end
 
+getgenv().Box = Box
 return Box
