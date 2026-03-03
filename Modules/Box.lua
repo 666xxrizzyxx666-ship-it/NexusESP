@@ -1,5 +1,5 @@
 --========================================================--
---  BOX MODULE
+--  BOX MODULE (LINORIA VERSION)
 --========================================================--
 
 function CreateBox(player)
@@ -33,6 +33,7 @@ function UpdateBox(player, char)
         return
     end
 
+    -- Camera globale définie dans Main.lua
     local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
     if not onScreen then
         box.Visible = false
