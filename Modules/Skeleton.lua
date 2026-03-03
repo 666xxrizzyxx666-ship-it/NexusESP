@@ -1,164 +1,106 @@
 -- ============================================================
---  Skeleton.lua — Dessin du squelette d'un character Roblox
---  Projette les articulations en 2D et relie les parties
---  avec des lignes Drawing.new("Line")
+--  Skeleton.lua — CORRIGE : outlines EN PREMIER (derriere)
+--  lignes colorees EN SECOND (devant) → bones visibles
 -- ============================================================
-
 local Skeleton = {}
 Skeleton.__index = Skeleton
 
-local Utils
-local Config
+local Utils, Config
 
-function Skeleton.SetDependencies(utils, config)
-    Utils  = utils
-    Config = config
-end
+function Skeleton.SetDependencies(u, c) Utils = u; Config = c end
 
--- ── Définition des liaisons squelettiques ────────────────────
--- Chaque paire {A, B} = ligne entre les deux parts nommées
-local BONE_PAIRS = {
-    -- Tronc
-    { "Head",              "UpperTorso"    },
-    { "UpperTorso",        "LowerTorso"    },
-    -- Bras droit
-    { "UpperTorso",        "RightUpperArm" },
-    { "RightUpperArm",     "RightLowerArm" },
-    { "RightLowerArm",     "RightHand"     },
-    -- Bras gauche
-    { "UpperTorso",        "LeftUpperArm"  },
-    { "LeftUpperArm",      "LeftLowerArm"  },
-    { "LeftLowerArm",      "LeftHand"      },
-    -- Jambe droite
-    { "LowerTorso",        "RightUpperLeg" },
-    { "RightUpperLeg",     "RightLowerLeg" },
-    { "RightLowerLeg",     "RightFoot"     },
-    -- Jambe gauche
-    { "LowerTorso",        "LeftUpperLeg"  },
-    { "LeftUpperLeg",      "LeftLowerLeg"  },
-    { "LeftLowerLeg",      "LeftFoot"      },
+local BONES_R15 = {
+    {"Head","UpperTorso"}, {"UpperTorso","LowerTorso"},
+    {"UpperTorso","RightUpperArm"}, {"RightUpperArm","RightLowerArm"}, {"RightLowerArm","RightHand"},
+    {"UpperTorso","LeftUpperArm"},  {"LeftUpperArm","LeftLowerArm"},   {"LeftLowerArm","LeftHand"},
+    {"LowerTorso","RightUpperLeg"}, {"RightUpperLeg","RightLowerLeg"}, {"RightLowerLeg","RightFoot"},
+    {"LowerTorso","LeftUpperLeg"},  {"LeftUpperLeg","LeftLowerLeg"},   {"LeftLowerLeg","LeftFoot"},
 }
 
--- Fallback pour les R6 (ancienne rig)
-local BONE_PAIRS_R6 = {
-    { "Head",       "Torso"      },
-    { "Torso",      "Left Arm"   },
-    { "Torso",      "Right Arm"  },
-    { "Left Arm",   "Left Leg"   },
-    { "Right Arm",  "Right Leg"  },
-    { "Torso",      "Left Leg"   },
-    { "Torso",      "Right Leg"  },
+local BONES_R6 = {
+    {"Head","Torso"},
+    {"Torso","Right Arm"}, {"Right Arm","Right Leg"},
+    {"Torso","Left Arm"},  {"Left Arm","Left Leg"},
+    {"Torso","Right Leg"}, {"Torso","Left Leg"},
 }
 
--- ── Constructeur ─────────────────────────────────────────────
+local MAX = math.max(#BONES_R15, #BONES_R6)
+
 function Skeleton.Create(player)
     local self = setmetatable({}, Skeleton)
     self.Player = player
-    self.Lines  = {}  -- Drawing Lines indexées par boneIndex
+    self.Out = {}   -- outlines
+    self.Col = {}   -- lignes colorees
 
-    -- On alloue les lignes pour les deux rigs (max = R15)
-    local maxBones = math.max(#BONE_PAIRS, #BONE_PAIRS_R6)
-    for i = 1, maxBones do
-        self.Lines[i] = Utils.NewDrawing("Line", {
-            Thickness = 1,
-            Color     = Color3.new(1, 1, 1),
-            Visible   = false,
-        })
-        -- Outline
-        self.Lines[i .. "_out"] = Utils.NewDrawing("Line", {
-            Thickness = 3,
-            Color     = Color3.new(0, 0, 0),
-            Visible   = false,
-        })
+    -- OUTLINES EN PREMIER (rendus derriere)
+    for i = 1, MAX do
+        self.Out[i] = Utils.NewDrawing("Line", { Thickness=3, Color=Color3.new(0,0,0), Visible=false })
+    end
+    -- LIGNES COLOREES EN SECOND (rendus devant)
+    for i = 1, MAX do
+        self.Col[i] = Utils.NewDrawing("Line", { Thickness=1, Color=Color3.new(1,1,1), Visible=false })
     end
 
     return self
 end
 
--- ── Détecter le rig (R6 / R15) ───────────────────────────────
-local function detectRig(character)
-    if character:FindFirstChild("UpperTorso") then
-        return "R15", BONE_PAIRS
-    elseif character:FindFirstChild("Torso") then
-        return "R6", BONE_PAIRS_R6
-    end
+local function getRig(char)
+    if char:FindFirstChild("UpperTorso") then return "R15", BONES_R15 end
+    if char:FindFirstChild("Torso")      then return "R6",  BONES_R6  end
     return nil, {}
 end
 
--- ── Mise à jour chaque frame ──────────────────────────────────
 function Skeleton:Update(character, cfg)
-    cfg = cfg or (Config and Config.Current and Config.Current.Skeleton) or {}
+    cfg = cfg or {}
+    if not cfg.Enabled or not character then self:Hide(); return end
 
-    if cfg.Enabled == false or not character then
-        self:Hide()
-        return
+    local _, bones = getRig(character)
+    if not bones or #bones == 0 then self:Hide(); return end
+
+    local c   = cfg.Color
+    local col = Color3.fromRGB(c and c.R or 255, c and c.G or 255, c and c.B or 255)
+    local th  = math.max(1, cfg.Thickness or 1)
+
+    -- reset tous
+    for i = 1, MAX do
+        self.Out[i].Visible = false
+        self.Col[i].Visible = false
     end
 
-    local rigType, pairs = detectRig(character)
-    if not rigType then
-        self:Hide()
-        return
-    end
-
-    local color     = cfg.Color and
-                      Color3.fromRGB(cfg.Color.R, cfg.Color.G, cfg.Color.B)
-                      or Color3.new(1, 1, 1)
-    local thickness = cfg.Thickness or 1
-
-    -- Désactive toutes les lignes d'abord
-    for i = 1, math.max(#BONE_PAIRS, #BONE_PAIRS_R6) do
-        if self.Lines[i] then
-            self.Lines[i].Visible = false
-            self.Lines[i .. "_out"].Visible = false
-        end
-    end
-
-    -- Dessine uniquement les bones du rig détecté
-    for i, pair in ipairs(pairs) do
-        local partA = character:FindFirstChild(pair[1])
-        local partB = character:FindFirstChild(pair[2])
-
-        if partA and partB then
-            local posA, onA = Utils.W2V(partA.Position)
-            local posB, onB = Utils.W2V(partB.Position)
-
+    for i, pair in ipairs(bones) do
+        local pA = character:FindFirstChild(pair[1])
+        local pB = character:FindFirstChild(pair[2])
+        if pA and pB then
+            local sA, onA = Utils.W2V(pA.Position)
+            local sB, onB = Utils.W2V(pB.Position)
             if onA and onB then
-                local outline = self.Lines[i .. "_out"]
-                local line    = self.Lines[i]
+                self.Out[i].From = sA; self.Out[i].To = sB
+                self.Out[i].Thickness = th + 2
+                self.Out[i].Visible = true
 
-                if outline then
-                    outline.From      = posA
-                    outline.To        = posB
-                    outline.Thickness = thickness + 2
-                    outline.Color     = Color3.new(0, 0, 0)
-                    outline.Visible   = true
-                end
-
-                if line then
-                    line.From      = posA
-                    line.To        = posB
-                    line.Thickness = thickness
-                    line.Color     = color
-                    line.Visible   = true
-                end
+                self.Col[i].From = sA; self.Col[i].To = sB
+                self.Col[i].Thickness = th
+                self.Col[i].Color = col
+                self.Col[i].Visible = true
             end
         end
     end
 end
 
--- ── Cacher ───────────────────────────────────────────────────
 function Skeleton:Hide()
-    for _, line in pairs(self.Lines) do
-        line.Visible = false
+    for i = 1, MAX do
+        self.Out[i].Visible = false
+        self.Col[i].Visible = false
     end
 end
 
--- ── Destruction ──────────────────────────────────────────────
 function Skeleton:Remove()
-    for _, line in pairs(self.Lines) do
-        Utils.RemoveDrawing(line)
+    for i = 1, MAX do
+        Utils.RemoveDrawing(self.Out[i])
+        Utils.RemoveDrawing(self.Col[i])
     end
-    self.Lines = {}
+    self.Out = {}
+    self.Col = {}
 end
 
 return Skeleton
