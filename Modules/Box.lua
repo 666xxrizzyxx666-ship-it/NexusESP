@@ -1,11 +1,37 @@
+local Camera = workspace.CurrentCamera
 local Box = {}
 
 function Box.Create(player)
-    print("[BOX] Create for:", player.Name)
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Color = Color3.fromRGB(255, 0, 0)
+    box.Visible = false
+
+    getgenv().ESP.Boxes[player] = box
 end
 
 function Box.Update(player)
-    print("[BOX] Update for:", player.Name)
+    local box = getgenv().ESP.Boxes[player]
+    if not box then return end
+
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        box.Visible = false
+        return
+    end
+
+    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+    if not onScreen then
+        box.Visible = false
+        return
+    end
+
+    -- Petit carré simple pour tester
+    box.Position = Vector2.new(pos.X - 25, pos.Y - 25)
+    box.Size = Vector2.new(50, 50)
+    box.Visible = true
 end
 
 getgenv().Box = Box
