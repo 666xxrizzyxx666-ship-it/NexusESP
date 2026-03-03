@@ -9,7 +9,7 @@
 -- ┌─────────────────────────────────────────────────────────┐
 -- │  CONFIGURATION — Remplacer par ton URL GitHub RAW       │
 -- └─────────────────────────────────────────────────────────┘
-local REPO_URL = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
+local REPO_URL = "https://raw.githubusercontent.com/TON_USERNAME/TON_REPO/main/"
 -- Exemple : "https://raw.githubusercontent.com/monpseudo/roblox-esp/main/"
 
 -- ── Loader GitHub ────────────────────────────────────────────
@@ -111,7 +111,7 @@ do
         end,
     })
 
-    Left:AddColorpicker("BoxColor", {
+    Left:AddColorPicker("BoxColor", {
         Text    = "Couleur de la Box",
         Default = Config.ToColor3(cfg.Box.Color),
         Tooltip = "Couleur du contour de la bounding box",
@@ -144,7 +144,7 @@ do
         end,
     })
 
-    Left:AddColorpicker("BoxFillColor", {
+    Left:AddColorPicker("BoxFillColor", {
         Text    = "Couleur fill",
         Default = Config.ToColor3(cfg.Box.FillColor),
         Tooltip = "Couleur du remplissage",
@@ -178,7 +178,7 @@ do
         end,
     })
 
-    Right:AddColorpicker("SkeletonColor", {
+    Right:AddColorPicker("SkeletonColor", {
         Text    = "Couleur Skeleton",
         Default = Config.ToColor3(cfg.Skeleton.Color),
         Tooltip = "Couleur des lignes squelettiques",
@@ -211,7 +211,7 @@ do
         end,
     })
 
-    Right:AddColorpicker("TracerColor", {
+    Right:AddColorPicker("TracerColor", {
         Text    = "Couleur Tracer",
         Default = Config.ToColor3(cfg.Tracers.Color),
         Callback = function(val)
@@ -379,7 +379,7 @@ do
         end,
     })
 
-    Right:AddColorpicker("NameColor", {
+    Right:AddColorPicker("NameColor", {
         Text    = "Couleur du Nom",
         Default = Config.ToColor3(cfg.Name.Color),
         Callback = function(val)
@@ -422,7 +422,7 @@ do
         end,
     })
 
-    Right:AddColorpicker("DistanceColor", {
+    Right:AddColorPicker("DistanceColor", {
         Text    = "Couleur distance",
         Default = Config.ToColor3(cfg.Distance.Color),
         Callback = function(val)
