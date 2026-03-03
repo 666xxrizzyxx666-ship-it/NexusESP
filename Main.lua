@@ -9,7 +9,7 @@
 -- ┌─────────────────────────────────────────────────────────┐
 -- │  CONFIGURATION — Remplacer par ton URL GitHub RAW       │
 -- └─────────────────────────────────────────────────────────┘
-local REPO_URL = "https://raw.githubusercontent.com/TON_USERNAME/TON_REPO/main/"
+local REPO_URL = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 -- Exemple : "https://raw.githubusercontent.com/monpseudo/roblox-esp/main/"
 
 -- ── Loader GitHub ────────────────────────────────────────────
