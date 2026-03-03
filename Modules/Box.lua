@@ -1,7 +1,9 @@
--- Modules/Box.lua
+--========================================================--
+--  BOX MODULE
+--========================================================--
 
 function CreateBox(player)
-    if player == game.Players.LocalPlayer then return end
+    if ESP.Boxes[player] then return end
 
     local box = Drawing.new("Square")
     box.Thickness = 2
@@ -15,6 +17,8 @@ function CreateBox(player)
 end
 
 function UpdateBox(player, char)
+    if not ESP.Box then return end
+
     local data = ESP.Boxes[player]
     if not data then
         CreateBox(player)
@@ -22,19 +26,13 @@ function UpdateBox(player, char)
     end
 
     local box = data.Main
-
-    if not ESP.Box then
-        box.Visible = false
-        return
-    end
-
     local hrp = char:FindFirstChild("HumanoidRootPart")
+
     if not hrp then
         box.Visible = false
         return
     end
 
-    local Camera = workspace.CurrentCamera
     local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
     if not onScreen then
         box.Visible = false
@@ -44,5 +42,6 @@ function UpdateBox(player, char)
     local size = Vector2.new(60, 80)
     box.Position = Vector2.new(pos.X - size.X/2, pos.Y - size.Y/2)
     box.Size = size
+    box.Color = ESP.BoxColor
     box.Visible = true
 end
