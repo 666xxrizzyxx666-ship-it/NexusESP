@@ -1,19 +1,39 @@
 --========================================================--
---  NEXUS ESP — MAIN FILE
+--  NEXUS ESP — MAIN FILE (LINORIA VERSION)
 --========================================================--
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+
+-- Camera globale pour les modules
+Camera = workspace.CurrentCamera
+
+--========================================================--
+--  LINORIA LIBRARY
+--========================================================--
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "Nexus ESP by Rizzy",
+    Center = true,
+    AutoShow = true
+})
+
+local Tabs = {
+    ESP = Window:AddTab("ESP")
+}
+
+local ESPGroup = Tabs.ESP:AddLeftGroupbox("Box ESP")
 
 --========================================================--
 --  ESP MASTER TABLE
 --========================================================--
 
 ESP = {
-    Enabled = true,
-
     Box = true,
     BoxColor = Color3.fromRGB(255, 0, 0),
 
@@ -35,6 +55,26 @@ local base = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP
 include(base .. "Box.lua")
 
 --========================================================--
+--  UI (LINORIA)
+--========================================================--
+
+ESPGroup:AddToggle("BoxToggle", {
+    Text = "Enable Box",
+    Default = true,
+    Callback = function(v)
+        ESP.Box = v
+    end
+})
+
+ESPGroup:AddColorPicker("BoxColorPicker", {
+    Title = "Box Color",
+    Default = ESP.BoxColor,
+    Callback = function(c)
+        ESP.BoxColor = c
+    end
+})
+
+--========================================================--
 --  MAIN LOOP
 --========================================================--
 
@@ -48,3 +88,5 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
+Library:Notify("Nexus ESP Loaded", 3)
