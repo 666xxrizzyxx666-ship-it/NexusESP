@@ -1,12 +1,11 @@
 --========================================================--
---  NEXUS ESP — MAIN FILE (LINORIA + MODULES)
+--  NEXUS BY RIZZY — MAIN FILE
 --========================================================--
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Camera globale pour les modules
 Camera = workspace.CurrentCamera
 
 --========================================================--
@@ -16,12 +15,11 @@ Camera = workspace.CurrentCamera
 ESP = {
     Box = true,
     BoxColor = Color3.fromRGB(255, 0, 0),
-
     Boxes = {}
 }
 
 --========================================================--
---  LINORIA LIBRARY
+--  LINORIA
 --========================================================--
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
@@ -29,17 +27,15 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Nexus ESP by Rizzy",
+    Title = "Nexus by Rizzy",
     Center = true,
     AutoShow = true
 })
 
--- Onglet VISUALS
 local Tabs = {
     Visuals = Window:AddTab("Visuals")
 }
 
--- Sous-catégorie ESP
 local ESPGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 
 --========================================================--
@@ -48,29 +44,27 @@ local ESPGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 
 local function include(url)
     local src = game:HttpGet(url)
-    local fn = loadstring(src)
-    return fn()
+    return loadstring(src)()
 end
 
 local base = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/main/Modules/"
-
 include(base .. "Box.lua")
 
 --========================================================--
---  UI (LINORIA)
+--  UI
 --========================================================--
 
-ESPGroup:AddToggle("BoxToggle", {
-    Text = "Box ESP",
+local BoxToggle = ESPGroup:AddToggle("Box", {
+    Text = "Box",
     Default = true,
     Callback = function(v)
         ESP.Box = v
     end
 })
 
-ESPGroup:AddColorPicker("BoxColorPicker", {
-    Title = "Box Color",
+BoxToggle:AddColorPicker("BoxColor", {
     Default = ESP.BoxColor,
+    Title = "Box Color",
     Callback = function(c)
         ESP.BoxColor = c
     end
@@ -91,4 +85,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-Library:Notify("Nexus ESP Loaded", 3)
+Library:Notify("Nexus by Rizzy Loaded", 3)
