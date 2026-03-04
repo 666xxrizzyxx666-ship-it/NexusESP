@@ -1,9 +1,8 @@
 -- ============================================================
---  PlayerList.lua — Liste joueurs moderne (ScreenGui)
---  Draggable | Filtrable | Spectate | Toggle ESP par joueur
+--  PlayerList.lua — Fenetre moderne draggable/resizable
+--  Spectate avec onglet dédié | ESP On/Off coloré | Filtres
 -- ============================================================
 local PlayerList = {}
-
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS        = game:GetService("UserInputService")
@@ -11,560 +10,561 @@ local Workspace  = game:GetService("Workspace")
 local LP         = Players.LocalPlayer
 
 local Utils, Config, ESP_ref
+function PlayerList.SetDependencies(u,c,e) Utils=u; Config=c; ESP_ref=e end
 
-function PlayerList.SetDependencies(u, c, e)
-    Utils   = u
-    Config  = c
-    ESP_ref = e
-end
-
--- ── Couleurs du thème ─────────────────────────────────────────
+-- ── Couleurs (mises à jour depuis Config.UI) ──────────────────
+local function C(r,g,b) return Color3.fromRGB(r,g,b) end
 local CLR = {
-    bg       = Color3.fromRGB(12, 12, 15),
-    bgRow    = Color3.fromRGB(20, 20, 26),
-    bgRowAlt = Color3.fromRGB(16, 16, 22),
-    header   = Color3.fromRGB(8,  8,  10),
-    accent   = Color3.fromRGB(0,  120, 255),
-    text     = Color3.fromRGB(220,220,230),
-    subtext  = Color3.fromRGB(140,140,155),
-    green    = Color3.fromRGB(40, 220, 100),
-    red      = Color3.fromRGB(220, 50, 50),
-    border   = Color3.fromRGB(35, 35, 50),
-    spectate = Color3.fromRGB(255, 180, 0),
+    bg=C(12,12,15), bgRow=C(20,20,26), bgRowAlt=C(16,16,22),
+    header=C(8,8,12), accent=C(0,120,255), text=C(220,220,230),
+    sub=C(130,130,145), green=C(40,210,90), red=C(210,45,45),
+    border=C(35,35,55), specActive=C(200,140,0),
+    espOn=C(25,130,60), espOff=C(160,30,30),
 }
 
 -- ── Etat ─────────────────────────────────────────────────────
-local gui          = nil
-local frame        = nil
-local listFrame    = nil
-local rows         = {}
-local updateConn   = nil
-local spectateConn = nil
+local gui, mainFrame, listScroll, specFrame
+local tabMain, tabSpec
+local rows = {}
+local updateConn, specConn
 local spectateTarget = nil
-local filterMode   = "All"   -- "All" | "Enemies" | "Custom"
-local customEnabled = {}     -- [player.Name] = bool
-local visible      = false
-local searchText   = ""
+local filterMode = "All"  -- "All","Enemies","Allies"
+local expandedPlayers = {}  -- [player] = bool
+local espDisabled = {}      -- [player] = bool
+local visible = false
 
--- ── Helper UI ─────────────────────────────────────────────────
-local function mkFrame(props)
-    local f = Instance.new("Frame")
-    for k,v in pairs(props) do f[k] = v end
-    return f
-end
-
-local function mkLabel(props)
-    local l = Instance.new("TextLabel")
-    l.BackgroundTransparency = 1
-    l.Font = Enum.Font.GothamMedium
-    l.TextColor3 = CLR.text
-    l.TextSize   = 12
-    for k,v in pairs(props) do l[k] = v end
+-- ── UI helpers ────────────────────────────────────────────────
+local function corner(p,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 6); c.Parent=p; return c end
+local function stroke(p,col,th) local s=Instance.new("UIStroke"); s.Color=col or CLR.border; s.Thickness=th or 1; s.Parent=p; return s end
+local function pad(p,n) local pd=Instance.new("UIPadding"); pd.PaddingLeft=UDim.new(0,n); pd.PaddingRight=UDim.new(0,n); pd.PaddingTop=UDim.new(0,n); pd.PaddingBottom=UDim.new(0,n); pd.Parent=p end
+local function lbl(props)
+    local l=Instance.new("TextLabel"); l.BackgroundTransparency=1
+    l.Font=Enum.Font.GothamMedium; l.TextColor3=CLR.text; l.TextSize=12
+    for k,v in pairs(props) do pcall(function() l[k]=v end) end
     return l
 end
-
-local function mkButton(props, onClick)
-    local b = Instance.new("TextButton")
-    b.BackgroundColor3 = props.Color or CLR.accent
-    b.TextColor3       = Color3.new(1,1,1)
-    b.Font             = Enum.Font.GothamBold
-    b.TextSize         = 11
-    b.BorderSizePixel  = 0
-    b.AutoButtonColor  = true
-    for k,v in pairs(props) do
-        if k ~= "Color" and k ~= "OnClick" then
-            pcall(function() b[k] = v end)
-        end
-    end
-    if onClick then b.MouseButton1Click:Connect(onClick) end
+local function btn(props, cb)
+    local b=Instance.new("TextButton"); b.Font=Enum.Font.GothamBold; b.TextSize=11
+    b.TextColor3=Color3.new(1,1,1); b.BorderSizePixel=0; b.AutoButtonColor=true
+    for k,v in pairs(props) do pcall(function() b[k]=v end) end
+    if cb then b.MouseButton1Click:Connect(cb) end
     return b
 end
 
-local function addCorner(parent, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius or 4)
-    c.Parent = parent
-    return c
-end
-
-local function addPadding(parent, p)
-    local pd = Instance.new("UIPadding")
-    pd.PaddingLeft   = UDim.new(0, p)
-    pd.PaddingRight  = UDim.new(0, p)
-    pd.PaddingTop    = UDim.new(0, p)
-    pd.PaddingBottom = UDim.new(0, p)
-    pd.Parent = parent
-end
-
--- ── Construction de la GUI ────────────────────────────────────
+-- ── Build GUI ─────────────────────────────────────────────────
 local function buildGUI()
-    -- ScreenGui
     gui = Instance.new("ScreenGui")
-    gui.Name              = "NexusESP_PlayerList"
-    gui.ResetOnSpawn      = false
-    gui.ZIndexBehavior    = Enum.ZIndexBehavior.Global
-    gui.IgnoreGuiInset    = true
+    gui.Name="NexusESP_PL"; gui.ResetOnSpawn=false
+    gui.IgnoreGuiInset=true; gui.ZIndexBehavior=Enum.ZIndexBehavior.Global
     pcall(function() syn.protect_gui(gui) end)
-    pcall(function() gui.Parent = game:GetService("CoreGui") end)
-    if not gui.Parent then gui.Parent = LP:WaitForChild("PlayerGui") end
+    pcall(function() gui.Parent=game:GetService("CoreGui") end)
+    if not gui.Parent then gui.Parent=LP:WaitForChild("PlayerGui") end
 
     -- Fenetre principale
-    frame = mkFrame({
-        Name              = "Window",
-        BackgroundColor3  = CLR.bg,
-        BorderSizePixel   = 0,
-        Size              = UDim2.fromOffset(340, 420),
-        Position          = UDim2.fromOffset(20, 100),
-        ClipsDescendants  = true,
-        Parent            = gui,
-    })
-    addCorner(frame, 8)
-
-    -- Bordure subtile
-    local stroke = Instance.new("UIStroke")
-    stroke.Color     = CLR.border
-    stroke.Thickness = 1
-    stroke.Parent    = frame
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name="PL_Window"; mainFrame.BackgroundColor3=CLR.bg
+    mainFrame.BorderSizePixel=0; mainFrame.ClipsDescendants=false
+    mainFrame.Size=UDim2.fromOffset(360,480); mainFrame.Position=UDim2.fromOffset(400,60)
+    mainFrame.Parent=gui
+    corner(mainFrame,10); stroke(mainFrame,CLR.border,1)
 
     -- ── Header ──────────────────────────────────────────────
-    local header = mkFrame({
-        BackgroundColor3 = CLR.header,
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(1,0,0,36),
-        Parent           = frame,
-    })
-    addCorner(header, 8)
+    local header=Instance.new("Frame")
+    header.BackgroundColor3=CLR.header; header.BorderSizePixel=0
+    header.Size=UDim2.new(1,0,0,38); header.Parent=mainFrame
+    corner(header,10)
 
-    -- Deco barre accent
-    local accentBar = mkFrame({
-        BackgroundColor3 = CLR.accent,
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(0,3,1,0),
-        Parent           = header,
-    })
+    local accent=Instance.new("Frame")
+    accent.BackgroundColor3=CLR.accent; accent.BorderSizePixel=0
+    accent.Size=UDim2.fromOffset(3,38); accent.Parent=header
 
-    local titleLbl = mkLabel({
-        Text             = "  👥  PLAYER LIST",
-        Font             = Enum.Font.GothamBold,
-        TextSize         = 13,
-        TextColor3       = Color3.new(1,1,1),
-        TextXAlignment   = Enum.TextXAlignment.Left,
-        Size             = UDim2.new(1,-70,1,0),
-        Position         = UDim2.fromOffset(8,0),
-        Parent           = header,
-    })
+    lbl({Text="👥  PLAYER LIST", Font=Enum.Font.GothamBold, TextSize=13,
+         TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left,
+         Size=UDim2.new(1,-100,1,0), Position=UDim2.fromOffset(10,0), Parent=header})
 
-    -- Compteur joueurs
-    local countLbl = mkLabel({
-        Name           = "CountLabel",
-        Text           = "0 joueurs",
-        TextColor3     = CLR.subtext,
-        TextSize       = 11,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Size           = UDim2.fromOffset(80, 36),
-        Position       = UDim2.new(1,-80,0,0),
-        Parent         = header,
-    })
+    -- Compteur
+    local countLbl=lbl({Name="Count", Text="0", TextColor3=CLR.sub, TextSize=11,
+        TextXAlignment=Enum.TextXAlignment.Right,
+        Size=UDim2.fromOffset(60,38), Position=UDim2.new(1,-90,0,0), Parent=header})
 
-    -- Bouton fermer
-    local closeBtn = mkButton({
-        Text             = "×",
-        TextSize         = 18,
-        Size             = UDim2.fromOffset(28,28),
-        Position         = UDim2.new(1,-32,0,4),
-        Color            = Color3.fromRGB(180,40,40),
-        Parent           = header,
-    }, function()
+    local closeB=btn({Text="×",TextSize=18,BackgroundColor3=C(160,30,30),
+        Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,-32,0,5),Parent=header}, function()
         PlayerList.Hide()
-    end)
-    addCorner(closeBtn, 4)
+    end); corner(closeB,5)
 
     -- ── Drag ────────────────────────────────────────────────
     do
-        local dragging, dragStart, startPos
-        header.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging  = true
-                dragStart = inp.Position
-                startPos  = frame.Position
-            end
+        local drag,dStart,sPos
+        header.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=true;dStart=i.Position;sPos=mainFrame.Position end
         end)
-        header.InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
+        header.InputEnded:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
         end)
-        UIS.InputChanged:Connect(function(inp)
-            if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                local delta = inp.Position - dragStart
-                frame.Position = UDim2.fromOffset(
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Offset + delta.Y
-                )
+        UIS.InputChanged:Connect(function(i)
+            if drag and i.UserInputType==Enum.UserInputType.MouseMovement then
+                local d=i.Position-dStart
+                mainFrame.Position=UDim2.fromOffset(sPos.X.Offset+d.X,sPos.Y.Offset+d.Y)
             end
         end)
     end
 
-    -- ── Filtres ──────────────────────────────────────────────
-    local filterBar = mkFrame({
-        BackgroundColor3 = Color3.fromRGB(15,15,20),
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(1,0,0,30),
-        Position         = UDim2.fromOffset(0,36),
-        Parent           = frame,
-    })
-
-    local filterLayout = Instance.new("UIListLayout")
-    filterLayout.FillDirection = Enum.FillDirection.Horizontal
-    filterLayout.Padding       = UDim.new(0,4)
-    filterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    filterLayout.Parent = filterBar
-    addPadding(filterBar, 4)
-
-    local filterBtns = {"Tous", "Ennemis", "Allies"}
-    for _, name in ipairs(filterBtns) do
-        local isActive = (name == "Tous" and filterMode == "All") or
-                         (name == "Ennemis" and filterMode == "Enemies") or
-                         (name == "Allies" and filterMode == "Allies")
-        local fb = mkButton({
-            Text     = name,
-            TextSize = 10,
-            Size     = UDim2.fromOffset(62, 22),
-            Color    = isActive and CLR.accent or Color3.fromRGB(35,35,45),
-            Name     = "Filter_"..name,
-            Parent   = filterBar,
-        }, function()
-            filterMode = name == "Tous" and "All" or name == "Ennemis" and "Enemies" or "Allies"
-            -- Mettre à jour les couleurs
-            for _, child in ipairs(filterBar:GetChildren()) do
-                if child:IsA("TextButton") then
-                    local active = (child.Name == "Filter_"..name)
-                    child.BackgroundColor3 = active and CLR.accent or Color3.fromRGB(35,35,45)
-                end
+    -- ── Resize handle ────────────────────────────────────────
+    local rsz=btn({Text="⇲",TextSize=13,BackgroundColor3=C(25,25,35),
+        Size=UDim2.fromOffset(18,18),Position=UDim2.new(1,-18,1,-18),Parent=mainFrame})
+    corner(rsz,4)
+    do
+        local resizing,rStart,rSize
+        rsz.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 then resizing=true;rStart=i.Position;rSize=mainFrame.AbsoluteSize end
+        end)
+        rsz.InputEnded:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 then resizing=false end
+        end)
+        UIS.InputChanged:Connect(function(i)
+            if resizing and i.UserInputType==Enum.UserInputType.MouseMovement then
+                local d=i.Position-rStart
+                local nw=math.clamp(rSize.X+d.X,280,700)
+                local nh=math.clamp(rSize.Y+d.Y,300,800)
+                mainFrame.Size=UDim2.fromOffset(nw,nh)
             end
         end)
-        addCorner(fb, 4)
     end
 
-    -- ── Zone de liste (ScrollingFrame) ───────────────────────
-    listFrame = Instance.new("ScrollingFrame")
-    listFrame.BackgroundTransparency = 1
-    listFrame.BorderSizePixel        = 0
-    listFrame.Size                   = UDim2.new(1,0,1,-66)
-    listFrame.Position               = UDim2.fromOffset(0,66)
-    listFrame.ScrollBarThickness     = 3
-    listFrame.ScrollBarImageColor3   = CLR.accent
-    listFrame.CanvasSize             = UDim2.new(0,0,0,0)
-    listFrame.AutomaticCanvasSize    = Enum.AutomaticSize.Y
-    listFrame.Parent                 = frame
+    -- ── Barre de filtres ────────────────────────────────────
+    local filterBar=Instance.new("Frame")
+    filterBar.BackgroundColor3=C(15,15,20); filterBar.BorderSizePixel=0
+    filterBar.Size=UDim2.new(1,0,0,30); filterBar.Position=UDim2.fromOffset(0,38)
+    filterBar.Parent=mainFrame
+    local fl=Instance.new("UIListLayout"); fl.FillDirection=Enum.FillDirection.Horizontal
+    fl.Padding=UDim.new(0,4); fl.VerticalAlignment=Enum.VerticalAlignment.Center
+    fl.Parent=filterBar; pad(filterBar,5)
 
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder   = Enum.SortOrder.LayoutOrder
-    listLayout.Padding     = UDim.new(0,1)
-    listLayout.Parent      = listFrame
-
-    addPadding(listFrame, 3)
-end
-
--- ── Créer / Mettre à jour une row ────────────────────────────
-local function buildRow(player, i)
-    local row = mkFrame({
-        BackgroundColor3 = i % 2 == 0 and CLR.bgRow or CLR.bgRowAlt,
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(1,-6,0,58),
-        LayoutOrder      = i,
-        Parent           = listFrame,
-    })
-    addCorner(row, 5)
-
-    -- Indicateur de visibilité (point coloré gauche)
-    local visDot = mkFrame({
-        Name             = "VisDot",
-        BackgroundColor3 = CLR.green,
-        BorderSizePixel  = 0,
-        Size             = UDim2.fromOffset(5, 5),
-        Position         = UDim2.fromOffset(5, 8),
-        Parent           = row,
-    })
-    addCorner(visDot, 3)
-
-    -- Nom
-    local nameLbl = mkLabel({
-        Name           = "NameLbl",
-        Text           = player.Name,
-        TextSize       = 13,
-        Font           = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size           = UDim2.new(1,-100,0,16),
-        Position       = UDim2.fromOffset(14, 4),
-        Parent         = row,
-    })
-
-    -- Distance
-    local distLbl = mkLabel({
-        Name           = "DistLbl",
-        Text           = "??m",
-        TextSize       = 11,
-        TextColor3     = CLR.subtext,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Size           = UDim2.fromOffset(70, 14),
-        Position       = UDim2.new(1,-74,0,5),
-        Parent         = row,
-    })
-
-    -- Equipe
-    local teamLbl = mkLabel({
-        Name           = "TeamLbl",
-        Text           = "No Team",
-        TextSize       = 10,
-        TextColor3     = CLR.subtext,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size           = UDim2.new(1,-80,0,12),
-        Position       = UDim2.fromOffset(14, 22),
-        Parent         = row,
-    })
-
-    -- Barre HP background
-    local hpBg = mkFrame({
-        Name             = "HpBg",
-        BackgroundColor3 = Color3.fromRGB(35,35,40),
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(1,-16,0,4),
-        Position         = UDim2.fromOffset(8, 36),
-        Parent           = row,
-    })
-    addCorner(hpBg, 2)
-
-    -- Barre HP fill
-    local hpBar = mkFrame({
-        Name             = "HpBar",
-        BackgroundColor3 = CLR.green,
-        BorderSizePixel  = 0,
-        Size             = UDim2.new(1,0,1,0),
-        Parent           = hpBg,
-    })
-    addCorner(hpBar, 2)
-
-    -- Bouton Toggle ESP
-    local espBtn = mkButton({
-        Name    = "EspBtn",
-        Text    = "👁 ESP ON",
-        TextSize = 10,
-        Size    = UDim2.fromOffset(75,18),
-        Position = UDim2.fromOffset(8, 42),
-        Color   = Color3.fromRGB(30,90,180),
-        Parent  = row,
-    }, function()
-        if ESP_ref then
-            local ents = ESP_ref.GetEntities()
-            local ent  = ents[player]
-            if ent then
-                ent.disabled = not ent.disabled
-                espBtn.Text             = ent.disabled and "👁 ESP OFF" or "👁 ESP ON"
-                espBtn.BackgroundColor3 = ent.disabled and Color3.fromRGB(80,30,30) or Color3.fromRGB(30,90,180)
+    local function setFilter(name)
+        filterMode=name
+        for _,child in ipairs(filterBar:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.BackgroundColor3=child.Name==("F_"..name) and CLR.accent or C(32,32,44)
             end
         end
-    end)
-    addCorner(espBtn, 4)
-
-    -- Bouton Spectate
-    local specBtn = mkButton({
-        Name    = "SpecBtn",
-        Text    = "🎥 Spectate",
-        TextSize = 10,
-        Size    = UDim2.fromOffset(80,18),
-        Position = UDim2.fromOffset(86, 42),
-        Color   = Color3.fromRGB(100,70,0),
-        Parent  = row,
-    }, function()
-        if spectateTarget == player then
-            PlayerList.StopSpectate()
-            specBtn.Text             = "🎥 Spectate"
-            specBtn.BackgroundColor3 = Color3.fromRGB(100,70,0)
-        else
-            PlayerList.StartSpectate(player)
-            -- reset tous les autres boutons
-            for _, r in pairs(rows) do
-                local sb = r.Frame and r.Frame:FindFirstChild("SpecBtn")
-                if sb then
-                    sb.Text             = "🎥 Spectate"
-                    sb.BackgroundColor3 = Color3.fromRGB(100,70,0)
-                end
-            end
-            specBtn.Text             = "⏹ Stop"
-            specBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+        -- rebuild rows
+        for p in pairs(rows) do
+            if rows[p] and rows[p].frame then rows[p].frame:Destroy() end
+            rows[p]=nil
         end
-    end)
-    addCorner(specBtn, 4)
+    end
 
-    rows[player] = { Frame = row, VisDot=visDot, NameLbl=nameLbl,
-                     DistLbl=distLbl, TeamLbl=teamLbl, HpBar=hpBar,
-                     EspBtn=espBtn, SpecBtn=specBtn }
-    return row
+    for i,name in ipairs({"Tous","Ennemis","Allies"}) do
+        local fb=btn({Name="F_"..(name=="Tous" and "All" or name=="Ennemis" and "Enemies" or "Allies"),
+            Text=name, TextSize=10,
+            BackgroundColor3=(i==1 and CLR.accent or C(32,32,44)),
+            Size=UDim2.fromOffset(66,22), Parent=filterBar})
+        corner(fb,5)
+        fb.MouseButton1Click:Connect(function()
+            local mode=(name=="Tous" and "All" or name=="Ennemis" and "Enemies" or "Allies")
+            setFilter(mode)
+        end)
+    end
+
+    -- ── Tabs (Main / Spectate) ───────────────────────────────
+    local tabBar=Instance.new("Frame")
+    tabBar.BackgroundColor3=C(10,10,14); tabBar.BorderSizePixel=0
+    tabBar.Size=UDim2.new(1,0,0,28); tabBar.Position=UDim2.fromOffset(0,68)
+    tabBar.Parent=mainFrame
+    local tl=Instance.new("UIListLayout"); tl.FillDirection=Enum.FillDirection.Horizontal
+    tl.Padding=UDim.new(0,2); tl.Parent=tabBar; pad(tabBar,4)
+
+    tabMain=btn({Name="TabMain",Text="Liste joueurs",TextSize=11,
+        BackgroundColor3=CLR.accent, Size=UDim2.fromOffset(120,20),Parent=tabBar})
+    corner(tabMain,5)
+
+    tabSpec=btn({Name="TabSpec",Text="Spectate",TextSize=11,
+        BackgroundColor3=C(32,32,44), Size=UDim2.fromOffset(100,20),Parent=tabBar,Visible=false})
+    corner(tabSpec,5)
+
+    -- ── Contenu liste ────────────────────────────────────────
+    listScroll=Instance.new("ScrollingFrame")
+    listScroll.Name="ListScroll"; listScroll.BackgroundTransparency=1
+    listScroll.BorderSizePixel=0; listScroll.ScrollBarThickness=3
+    listScroll.ScrollBarImageColor3=CLR.accent
+    listScroll.Size=UDim2.new(1,0,1,-96); listScroll.Position=UDim2.fromOffset(0,96)
+    listScroll.CanvasSize=UDim2.new(0,0,0,0); listScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
+    listScroll.Parent=mainFrame
+    local ll=Instance.new("UIListLayout"); ll.SortOrder=Enum.SortOrder.LayoutOrder
+    ll.Padding=UDim.new(0,2); ll.Parent=listScroll; pad(listScroll,4)
+
+    -- ── Contenu spectate ─────────────────────────────────────
+    specFrame=Instance.new("Frame")
+    specFrame.Name="SpecFrame"; specFrame.BackgroundTransparency=1
+    specFrame.Size=UDim2.new(1,0,1,-96); specFrame.Position=UDim2.fromOffset(0,96)
+    specFrame.Visible=false; specFrame.Parent=mainFrame
+
+    -- UI spectate
+    local specBg=Instance.new("Frame")
+    specBg.BackgroundColor3=C(15,15,20); specBg.BorderSizePixel=0
+    specBg.Size=UDim2.new(1,-8,1,-8); specBg.Position=UDim2.fromOffset(4,4)
+    specBg.Parent=specFrame; corner(specBg,8)
+
+    lbl({Name="SpecName",Text="Aucun joueur",Font=Enum.Font.GothamBold,TextSize=16,
+         TextColor3=Color3.new(1,1,1),TextXAlignment=Enum.TextXAlignment.Center,
+         Size=UDim2.new(1,0,0,30),Position=UDim2.fromOffset(0,10),Parent=specBg})
+    lbl({Name="SpecInfo",Text="",TextSize=12,TextColor3=CLR.sub,
+         TextXAlignment=Enum.TextXAlignment.Center,
+         Size=UDim2.new(1,0,0,60),Position=UDim2.fromOffset(0,45),Parent=specBg})
+
+    -- HP bar spectate
+    local hpBgS=Instance.new("Frame"); hpBgS.Name="HpBg"
+    hpBgS.BackgroundColor3=C(30,30,40); hpBgS.BorderSizePixel=0
+    hpBgS.Size=UDim2.new(1,-20,0,8); hpBgS.Position=UDim2.fromOffset(10,115)
+    hpBgS.Parent=specBg; corner(hpBgS,4)
+    local hpFillS=Instance.new("Frame"); hpFillS.Name="HpFill"
+    hpFillS.BackgroundColor3=CLR.green; hpFillS.BorderSizePixel=0
+    hpFillS.Size=UDim2.new(0.75,0,1,0); hpFillS.Parent=hpBgS; corner(hpFillS,4)
+
+    local stopSpecBtn=btn({Text="⏹  Arreter spectate",TextSize=12,
+        BackgroundColor3=C(160,30,30),Size=UDim2.new(1,-20,0,32),
+        Position=UDim2.fromOffset(10,135),Parent=specBg}, function()
+        PlayerList.StopSpectate()
+    end); corner(stopSpecBtn,6)
+
+    -- Tabs switch
+    tabMain.MouseButton1Click:Connect(function()
+        listScroll.Visible=true; specFrame.Visible=false
+        tabMain.BackgroundColor3=CLR.accent; tabSpec.BackgroundColor3=C(32,32,44)
+    end)
+    tabSpec.MouseButton1Click:Connect(function()
+        listScroll.Visible=false; specFrame.Visible=true
+        tabSpec.BackgroundColor3=CLR.accent; tabMain.BackgroundColor3=C(32,32,44)
+    end)
 end
 
--- ── Update des données ────────────────────────────────────────
+-- ── Filtrage ─────────────────────────────────────────────────
 local function shouldShow(player)
-    if filterMode == "Enemies" then
-        return not Utils.SameTeam(player)
-    elseif filterMode == "Allies" then
-        return Utils.SameTeam(player)
-    end
+    if filterMode=="Enemies" then return not Utils.SameTeam(player) end
+    if filterMode=="Allies"  then return Utils.SameTeam(player) end
     return true
 end
 
-local function updateRows()
-    if not visible or not listFrame then return end
+-- ── Créer une row joueur ──────────────────────────────────────
+local function buildRow(player, idx)
+    local rowData = {}
+    local expanded = expandedPlayers[player] or false
 
+    local rowFrame=Instance.new("Frame")
+    rowFrame.BackgroundColor3=(idx%2==0) and CLR.bgRow or CLR.bgRowAlt
+    rowFrame.BorderSizePixel=0
+    rowFrame.Size=UDim2.new(1,-8,0, expanded and 130 or 60)
+    rowFrame.LayoutOrder=idx; rowFrame.ClipsDescendants=true
+    rowFrame.Parent=listScroll; corner(rowFrame,6)
+
+    -- Dot visibilité
+    local visDot=Instance.new("Frame"); visDot.Name="VisDot"
+    visDot.BackgroundColor3=CLR.green; visDot.BorderSizePixel=0
+    visDot.Size=UDim2.fromOffset(6,6); visDot.Position=UDim2.fromOffset(6,8)
+    visDot.Parent=rowFrame; corner(visDot,3)
+
+    -- Nom
+    local nameLbl=lbl({Name="NameLbl",Text=player.Name,Font=Enum.Font.GothamBold,TextSize=13,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        Size=UDim2.new(1,-120,0,16),Position=UDim2.fromOffset(16,4),Parent=rowFrame})
+
+    -- Distance
+    local distLbl=lbl({Name="DistLbl",Text="?m",TextSize=11,TextColor3=CLR.sub,
+        TextXAlignment=Enum.TextXAlignment.Right,
+        Size=UDim2.fromOffset(60,14),Position=UDim2.new(1,-64,0,5),Parent=rowFrame})
+
+    -- Team
+    local teamLbl=lbl({Name="TeamLbl",Text="No Team",TextSize=10,TextColor3=CLR.sub,
+        TextXAlignment=Enum.TextXAlignment.Left,
+        Size=UDim2.new(0.5,0,0,12),Position=UDim2.fromOffset(16,22),Parent=rowFrame})
+
+    -- HP bar
+    local hpBg=Instance.new("Frame"); hpBg.BackgroundColor3=C(30,30,40); hpBg.BorderSizePixel=0
+    hpBg.Size=UDim2.new(1,-16,0,4); hpBg.Position=UDim2.fromOffset(8,36); hpBg.Parent=rowFrame; corner(hpBg,2)
+    local hpBar=Instance.new("Frame"); hpBar.Name="HpBar"; hpBar.BackgroundColor3=CLR.green; hpBar.BorderSizePixel=0
+    hpBar.Size=UDim2.new(1,0,1,0); hpBar.Parent=hpBg; corner(hpBar,2)
+
+    -- Boutons ligne 1
+    local espDisabledState = espDisabled[player] or false
+    local espBtn=btn({Name="EspBtn",
+        Text= espDisabledState and "🚫  ESP OFF" or "👁  ESP ON",
+        TextSize=10,
+        BackgroundColor3= espDisabledState and CLR.espOff or CLR.espOn,
+        Size=UDim2.fromOffset(80,18), Position=UDim2.fromOffset(8,42),
+        Parent=rowFrame}, function()
+        espDisabled[player] = not espDisabled[player]
+        local off = espDisabled[player]
+        local espBtn2 = rowFrame:FindFirstChild("EspBtn")
+        if espBtn2 then
+            espBtn2.Text = off and "🚫  ESP OFF" or "👁  ESP ON"
+            espBtn2.BackgroundColor3 = off and CLR.espOff or CLR.espOn
+        end
+        if ESP_ref then
+            local ents = ESP_ref.GetEntities()
+            if ents[player] then ents[player].disabled = off end
+        end
+    end); corner(espBtn,4)
+
+    local specBtn=btn({Name="SpecBtn",
+        Text= (spectateTarget==player) and "⏹  Stop" or "🎥  Spectate",
+        TextSize=10,
+        BackgroundColor3=(spectateTarget==player) and CLR.red or C(80,55,10),
+        Size=UDim2.fromOffset(86,18), Position=UDim2.fromOffset(92,42),
+        Parent=rowFrame}, function()
+        if spectateTarget==player then
+            PlayerList.StopSpectate()
+        else
+            PlayerList.StartSpectate(player)
+        end
+    end); corner(specBtn,4)
+
+    -- Bouton expand (flèche)
+    local arrowBtn=btn({Name="ArrowBtn",
+        Text= expanded and "▲" or "▼",
+        TextSize=10, BackgroundColor3=C(30,30,44),
+        Size=UDim2.fromOffset(24,18), Position=UDim2.new(1,-28,0,42),
+        Parent=rowFrame}, function()
+        expandedPlayers[player] = not (expandedPlayers[player] or false)
+        -- Rebuild row
+        rowData.frame:Destroy()
+        rows[player]=nil
+    end); corner(arrowBtn,4)
+
+    -- Zone étendue (infos détaillées)
+    local extendedFrame=Instance.new("Frame")
+    extendedFrame.Name="Extended"; extendedFrame.BackgroundTransparency=1
+    extendedFrame.Size=UDim2.new(1,0,0,68); extendedFrame.Position=UDim2.fromOffset(0,62)
+    extendedFrame.Visible=expanded; extendedFrame.Parent=rowFrame
+
+    local infoLbl=lbl({Name="InfoLbl",Text="",TextSize=10,TextColor3=CLR.sub,
+        TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true,
+        Size=UDim2.new(1,-8,0,44),Position=UDim2.fromOffset(8,2),Parent=extendedFrame})
+
+    rowData = {
+        frame=rowFrame, visDot=visDot, nameLbl=nameLbl, distLbl=distLbl,
+        teamLbl=teamLbl, hpBar=hpBar, espBtn=espBtn, specBtn=specBtn,
+        arrowBtn=arrowBtn, infoLbl=infoLbl, extendedFrame=extendedFrame,
+    }
+    rows[player] = rowData
+    return rowData
+end
+
+-- ── Update rows ───────────────────────────────────────────────
+local function updateRows()
+    if not visible or not listScroll then return end
     local playerList = Players:GetPlayers()
     local idx = 0
+    local count = 0
 
-    -- Supprimer les rows de joueurs partis
-    for p, rowData in pairs(rows) do
-        if not p.Parent or p.Parent ~= Players then
-            rowData.Frame:Destroy()
-            rows[p] = nil
+    -- Nettoyer joueurs déconnectés
+    for p in pairs(rows) do
+        if not p.Parent then
+            if rows[p] then rows[p].frame:Destroy(); rows[p]=nil end
         end
     end
 
     for _, player in ipairs(playerList) do
-        if player == LP then continue end
+        if player==LP then continue end
         if not shouldShow(player) then
-            if rows[player] then rows[player].Frame.Visible = false end
+            if rows[player] then rows[player].frame.Visible=false end
             continue
         end
+        count = count+1
+        idx = idx+1
 
-        idx = idx + 1
-
-        -- Créer la row si elle n'existe pas
         if not rows[player] then buildRow(player, idx) end
+        local r = rows[player]
+        if not r then continue end
 
-        local rowData = rows[player]
-        if not rowData then continue end
-
-        rowData.Frame.Visible     = true
-        rowData.Frame.LayoutOrder = idx
+        r.frame.Visible = true
+        r.frame.LayoutOrder = idx
 
         local char = player.Character
         local root = char and Utils.GetRoot(char)
 
         -- Distance
         local dist = root and math.floor(Utils.GetDistance(root.Position)) or -1
-        rowData.DistLbl.Text = dist >= 0 and (dist.."m") or "??"
+        r.distLbl.Text = dist>=0 and (dist.."m") or "??"
 
         -- Equipe + couleur nom
         if player.Team then
-            rowData.TeamLbl.Text      = player.Team.Name
-            rowData.NameLbl.TextColor3 = player.Team.TeamColor.Color
+            r.teamLbl.Text="⬡ "..player.Team.Name
+            r.nameLbl.TextColor3=player.Team.TeamColor.Color
         else
-            rowData.TeamLbl.Text       = "No Team"
-            rowData.NameLbl.TextColor3 = CLR.text
+            r.teamLbl.Text="No Team"; r.nameLbl.TextColor3=CLR.text
         end
 
-        -- HP bar
+        -- HP
         local hp = char and Utils.GetHealthPercent(char) or 0
-        rowData.HpBar.Size             = UDim2.new(math.max(0, hp), 0, 1, 0)
-        rowData.HpBar.BackgroundColor3 = Utils.HealthColor(hp)
+        r.hpBar.Size=UDim2.new(math.max(0,hp),0,1,0)
+        r.hpBar.BackgroundColor3=Utils.HealthColor(hp)
 
         -- Visibilité
-        local isVis = root and Utils.IsVisible(root.Position) or false
-        rowData.VisDot.BackgroundColor3 = isVis and CLR.green or CLR.red
+        local vis = root and Utils.IsVisible(root.Position) or false
+        r.visDot.BackgroundColor3 = vis and CLR.green or CLR.red
+
+        -- Infos étendues
+        if expandedPlayers[player] then
+            r.frame.Size=UDim2.new(1,-8,0,130); r.extendedFrame.Visible=true
+            r.arrowBtn.Text="▲"
+            local hum = char and Utils.GetHumanoid(char)
+            local hpTxt = hum and string.format("%.0f / %.0f", hum.Health, hum.MaxHealth) or "?"
+            local acc = player.Character and player.Character:FindFirstChildOfClass("Accessory")
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            r.infoLbl.Text=string.format(
+                "HP: %s  |  Dist: %s\nEquipe: %s  |  Visible: %s\nOutil: %s  |  Ping: %sms",
+                hpTxt,
+                dist>=0 and (dist.."m") or "??",
+                player.Team and player.Team.Name or "Aucune",
+                vis and "✅" or "❌",
+                tool and tool.Name or "Aucun",
+                tostring(player:GetNetworkPing and math.floor(player:GetNetworkPing()*1000) or "?")
+            )
+        else
+            r.frame.Size=UDim2.new(1,-8,0,62); r.extendedFrame.Visible=false
+            r.arrowBtn.Text="▼"
+        end
+
+        -- ESP button état
+        local off = espDisabled[player] or false
+        r.espBtn.Text=off and "🚫  ESP OFF" or "👁  ESP ON"
+        r.espBtn.BackgroundColor3=off and CLR.espOff or CLR.espOn
+
+        -- Spec button état
+        local isSpec = (spectateTarget==player)
+        r.specBtn.Text=isSpec and "⏹  Stop" or "🎥  Spectate"
+        r.specBtn.BackgroundColor3=isSpec and CLR.red or C(80,55,10)
     end
 
-    -- Mettre à jour le compteur
-    local countLbl = frame and frame:FindFirstChild("Window", true)
-    local header   = frame and frame:FindFirstChildWhichIsA("Frame")
+    -- Compteur
+    local header = mainFrame and mainFrame:FindFirstChildOfClass("Frame")
     if header then
-        local cl = header:FindFirstChild("CountLabel")
-        if cl then cl.Text = idx.." joueurs" end
+        local cl=header:FindFirstChild("Count")
+        if cl then cl.Text=count.." joueur"..(count>1 and "s" or "") end
     end
 end
 
--- ── Spectate ─────────────────────────────────────────────────
+-- ── Update spectate frame ──────────────────────────────────────
+local function updateSpecFrame()
+    if not specFrame or not spectateTarget then return end
+    local bg = specFrame:FindFirstChildOfClass("Frame")
+    if not bg then return end
+
+    local nameLbl2 = bg:FindFirstChild("SpecName")
+    local infoLbl2 = bg:FindFirstChild("SpecInfo")
+    local hpBg2    = bg:FindFirstChild("HpBg")
+
+    local char = spectateTarget.Character
+    local hum  = char and Utils.GetHumanoid(char)
+    local root = char and Utils.GetRoot(char)
+    local dist = root and math.floor(Utils.GetDistance(root.Position)) or -1
+    local hp   = char and Utils.GetHealthPercent(char) or 0
+
+    if nameLbl2 then
+        nameLbl2.Text="🎥  "..spectateTarget.Name
+        nameLbl2.TextColor3=spectateTarget.Team and spectateTarget.Team.TeamColor.Color or Color3.new(1,1,1)
+    end
+    if infoLbl2 then
+        local tool = char and char:FindFirstChildOfClass("Tool")
+        infoLbl2.Text=string.format(
+            "HP: %s/%s  |  Distance: %sm\nEquipe: %s  |  Outil: %s",
+            hum and math.floor(hum.Health) or "?",
+            hum and math.floor(hum.MaxHealth) or "?",
+            dist>=0 and dist or "??",
+            spectateTarget.Team and spectateTarget.Team.Name or "Aucune",
+            tool and tool.Name or "Aucun"
+        )
+    end
+    if hpBg2 then
+        local fill=hpBg2:FindFirstChild("HpFill")
+        if fill then
+            fill.Size=UDim2.new(math.max(0,hp),0,1,0)
+            fill.BackgroundColor3=Utils.HealthColor(hp)
+        end
+    end
+end
+
+-- ── Spectate ──────────────────────────────────────────────────
 function PlayerList.StartSpectate(player)
     PlayerList.StopSpectate()
     spectateTarget = player
 
-    local cam = Workspace.CurrentCamera
-    cam.CameraType = Enum.CameraType.Scriptable
+    -- Afficher l'onglet spectate et y aller
+    if tabSpec then tabSpec.Visible=true end
+    -- Switch vers tab spec automatiquement
+    if listScroll then listScroll.Visible=false end
+    if specFrame  then specFrame.Visible=true  end
+    if tabSpec    then tabSpec.BackgroundColor3=CLR.accent end
+    if tabMain    then tabMain.BackgroundColor3=C(32,32,44) end
 
-    spectateConn = RunService.RenderStepped:Connect(function()
+    -- Camera mode scriptable avec liberté de mouvement
+    local cam = Workspace.CurrentCamera
+    cam.CameraType=Enum.CameraType.Custom
+
+    specConn = RunService.RenderStepped:Connect(function()
         if not spectateTarget or not spectateTarget.Character then return end
-        local root = Utils.GetRoot(spectateTarget.Character)
-        local head = spectateTarget.Character:FindFirstChild("Head")
-        if root then
-            cam.CFrame = CFrame.new(root.Position + Vector3.new(0,2,0)) *
-                         CFrame.Angles(0, math.pi, 0) *
-                         CFrame.new(0,0,5)
-        end
+        local char = spectateTarget.Character
+        local root = Utils.GetRoot(char)
+        if not root then return end
+        -- Camera scriptable : suit en mode "over shoulder" libre
+        -- On change juste le CameraSubject pour garder le contrôle natif
+        cam.CameraSubject = char:FindFirstChildOfClass("Humanoid") or root
+        pcall(updateSpecFrame)
     end)
 end
 
 function PlayerList.StopSpectate()
     spectateTarget = nil
-    if spectateConn then spectateConn:Disconnect(); spectateConn = nil end
+    if specConn then specConn:Disconnect(); specConn=nil end
+
+    -- Remettre la caméra sur le joueur local
     local cam = Workspace.CurrentCamera
-    cam.CameraType = Enum.CameraType.Custom
+    local lchar = LP.Character
+    if lchar then
+        local lhum = lchar:FindFirstChildOfClass("Humanoid")
+        if lhum then cam.CameraSubject=lhum end
+    end
+    cam.CameraType=Enum.CameraType.Custom
+
+    -- Retour tab liste
+    if tabSpec    then tabSpec.Visible=false; tabSpec.BackgroundColor3=C(32,32,44) end
+    if tabMain    then tabMain.BackgroundColor3=CLR.accent end
+    if listScroll then listScroll.Visible=true  end
+    if specFrame  then specFrame.Visible=false  end
 end
 
--- ── Show / Hide ───────────────────────────────────────────────
+-- ── Show / Hide / Toggle ──────────────────────────────────────
 function PlayerList.Show()
-    if visible then return end
-    visible = true
+    if visible then return end; visible=true
     buildGUI()
-    updateConn = RunService.Heartbeat:Connect(function()
-        pcall(updateRows)
-    end)
+    updateConn = RunService.Heartbeat:Connect(function() pcall(updateRows) end)
 end
 
 function PlayerList.Hide()
-    visible = false
-    if updateConn then updateConn:Disconnect(); updateConn = nil end
+    visible=false
+    if updateConn then updateConn:Disconnect(); updateConn=nil end
     PlayerList.StopSpectate()
-    if gui then gui:Destroy(); gui = nil end
-    frame = nil; listFrame = nil; rows = {}
+    if gui then gui:Destroy(); gui=nil end
+    mainFrame=nil; listScroll=nil; specFrame=nil; tabMain=nil; tabSpec=nil; rows={}
 end
 
 function PlayerList.Toggle()
     if visible then PlayerList.Hide() else PlayerList.Show() end
 end
 
-function PlayerList.Cleanup()
-    PlayerList.Hide()
-end
-
--- ── Focus (legacy - maintenant c'est Spectate) ───────────────
-function PlayerList.FocusPlayer(player)
-    PlayerList.StartSpectate(player)
-end
-
-function PlayerList.Unfocus()
-    PlayerList.StopSpectate()
-end
+function PlayerList.Cleanup() PlayerList.Hide() end
 
 function PlayerList.TogglePlayerESP(player)
-    if not ESP_ref then return end
-    local ents = ESP_ref.GetEntities()
-    local ent  = ents[player]
-    if ent then ent.disabled = not ent.disabled end
+    espDisabled[player] = not (espDisabled[player] or false)
+    if ESP_ref then
+        local ents=ESP_ref.GetEntities()
+        if ents[player] then ents[player].disabled=espDisabled[player] end
+    end
 end
 
-function PlayerList.GetData()
-    local data = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LP then continue end
-        local char = p.Character
-        local root = char and Utils.GetRoot(char)
-        table.insert(data, {
-            player   = p,
-            name     = p.Name,
-            distance = root and math.floor(Utils.GetDistance(root.Position)) or -1,
-            health   = char and Utils.GetHealthPercent(char) or 0,
-            team     = p.Team and p.Team.Name or "No Team",
-            visible  = root and Utils.IsVisible(root.Position) or false,
-        })
-    end
-    return data
+function PlayerList.StartSpectateByName(name)
+    local p=Players:FindFirstChild(name)
+    if p then PlayerList.StartSpectate(p) end
 end
 
 return PlayerList
