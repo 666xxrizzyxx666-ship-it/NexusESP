@@ -1,20 +1,13 @@
--- ============================================================
---  Tracers.lua — CORRIGE : outline EN PREMIER, ligne EN SECOND
--- ============================================================
 local Tracers = {}
 Tracers.__index = Tracers
-
 local Utils, Config
-
-function Tracers.SetDependencies(u, c) Utils = u; Config = c end
+function Tracers.SetDependencies(u,c) Utils=u; Config=c end
 
 function Tracers.Create(player)
     local self = setmetatable({}, Tracers)
-    self.Player = player
-    -- outline EN PREMIER
-    self.Outline = Utils.NewDrawing("Line", { Thickness=3, Color=Color3.new(0,0,0), Visible=false })
-    -- ligne coloree EN SECOND
-    self.Line    = Utils.NewDrawing("Line", { Thickness=1, Color=Color3.new(1,1,1), Visible=false })
+    self.Player  = player
+    self.Outline = Utils.NewDrawing("Line", {Thickness=3, Color=Color3.new(0,0,0), Visible=false}, 1)
+    self.Line    = Utils.NewDrawing("Line", {Thickness=1, Color=Color3.new(1,1,1), Visible=false}, 2)
     return self
 end
 
@@ -26,22 +19,25 @@ local function srcPoint(pos)
 end
 
 function Tracers:Update(character, cfg)
+    self.Outline.Visible = false
+    self.Line.Visible    = false
+
     cfg = cfg or {}
-    if not cfg.Enabled or not character then self:Hide(); return end
+    if not cfg.Enabled or not character then return end
 
     local root = Utils.GetRoot(character)
-    if not root then self:Hide(); return end
+    if not root then return end
 
     local tp, on = Utils.W2V(root.Position)
-    if not on then self:Hide(); return end
+    if not on or not tp then return end
 
-    local c   = cfg.Color
-    local col = Color3.fromRGB(c and c.R or 255, c and c.G or 255, c and c.B or 255)
+    local c   = cfg.Color or {R=255,G=255,B=255}
+    local col = Color3.fromRGB(c.R, c.G, c.B)
     local th  = math.max(1, cfg.Thickness or 1)
     local src = srcPoint(cfg.Position or "Bottom")
 
-    self.Outline.From = src; self.Outline.To = tp; self.Outline.Thickness = th+2; self.Outline.Visible = true
-    self.Line.From    = src; self.Line.To    = tp; self.Line.Thickness    = th;   self.Line.Color = col; self.Line.Visible = true
+    self.Outline.From=src; self.Outline.To=tp; self.Outline.Thickness=th+2; self.Outline.Visible=true
+    self.Line.From=src;    self.Line.To=tp;    self.Line.Thickness=th; self.Line.Color=col; self.Line.Visible=true
 end
 
 function Tracers:Hide()
