@@ -2,6 +2,13 @@
 --  NexusESP — Main.lua  |  RightCtrl = toggle UI
 -- ============================================================
 
+-- Version du script : MAJOR.MINOR.PATCH
+-- Incrementer a chaque modification :
+--   PATCH  (+0.0.1) = correction de bug
+--   MINOR  (+0.1.0) = nouvelle feature
+--   MAJOR  (+1.0.0) = refonte complete
+local VERSION = "1.3.0"
+
 local REPO_URL = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 local function include(path)
@@ -47,7 +54,7 @@ local function save() Config:Save() end
 --  WINDOW
 -- ════════════════════════════════════════════════════════════
 local Window = Library:CreateWindow({
-    Title="NexusESP", Center=true, AutoShow=true, TabPadding=8, MenuFadeTime=0.2,
+    Title="NexusESP  v"..VERSION, Center=true, AutoShow=true, TabPadding=8, MenuFadeTime=0.2,
 })
 
 local Tabs = {
@@ -314,4 +321,4 @@ if cfg.PlayerList.Enabled and PlayerList then PlayerList.Show() end
 if cfg.FOV.Enabled      and FOV          then FOV.Show(cfg.FOV)  end
 if cfg.Radar.Enabled    and Radar        then Radar.Show()       end
 
-print("[NexusESP] Charge! RightCtrl = toggle UI")
+print("[NexusESP] v"..VERSION.." charge! RightCtrl = toggle UI")
