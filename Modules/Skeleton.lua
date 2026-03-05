@@ -1,6 +1,9 @@
-local Skeleton = {}; Skeleton.__index = Skeleton
+-- Skeleton: each bone = 1 Line only, no outline
+-- NOTE: Draw skeleton AFTER box fill so lines appear on top
+local Skeleton = {}
+Skeleton.__index = Skeleton
 local Utils, Config
-function Skeleton.SetDependencies(u,c) Utils=u; Config=c end
+function Skeleton.SetDependencies(u, c) Utils = u; Config = c end
 
 local R15 = {
     {"Head","UpperTorso"}, {"UpperTorso","LowerTorso"},
@@ -15,26 +18,27 @@ local R6 = {
     {"Torso","Left Arm"}, {"Left Arm","Left Leg"},
     {"Torso","Right Leg"},{"Torso","Left Leg"},
 }
-local MAX = math.max(#R15,#R6)
+local MAX = math.max(#R15, #R6)
 
 function Skeleton.Create()
     local s = setmetatable({}, Skeleton)
     s.Lines = {}
-    for i=1,MAX do
+    for i = 1, MAX do
         s.Lines[i] = Utils.NewDrawing("Line", {Thickness=1, Color=Color3.new(1,1,1)})
     end
     return s
 end
 
-local function rig(char)
+local function getRig(char)
     if char:FindFirstChild("UpperTorso") then return R15 end
     if char:FindFirstChild("Torso")      then return R6  end
+    return nil
 end
 
 function Skeleton:Update(char, cfg)
-    for i=1,MAX do self.Lines[i].Visible=false end
+    for i = 1, MAX do self.Lines[i].Visible = false end
     if not cfg or not cfg.Enabled or not char then return end
-    local bones = rig(char)
+    local bones = getRig(char)
     if not bones then return end
     local col = Utils.C3(cfg.Color)
     local th  = math.max(1, cfg.Thickness or 1)
@@ -45,14 +49,16 @@ function Skeleton:Update(char, cfg)
             local sA, onA = Utils.W2V(pA.Position)
             local sB, onB = Utils.W2V(pB.Position)
             if onA and onB then
-                self.Lines[i].From=sA; self.Lines[i].To=sB
-                self.Lines[i].Color=col; self.Lines[i].Thickness=th
-                self.Lines[i].Visible=true
+                self.Lines[i].From      = sA
+                self.Lines[i].To        = sB
+                self.Lines[i].Color     = col
+                self.Lines[i].Thickness = th
+                self.Lines[i].Visible   = true
             end
         end
     end
 end
 
-function Skeleton:Hide() for i=1,MAX do self.Lines[i].Visible=false end end
-function Skeleton:Remove() for i=1,MAX do Utils.Kill(self.Lines[i]) end end
+function Skeleton:Hide()   for i = 1, MAX do self.Lines[i].Visible = false end end
+function Skeleton:Remove() for i = 1, MAX do Utils.Kill(self.Lines[i]) end; self.Lines = {} end
 return Skeleton
