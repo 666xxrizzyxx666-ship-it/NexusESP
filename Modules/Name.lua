@@ -1,12 +1,13 @@
-local Name = {}; Name.__index = Name
+-- Name: Drawing.Text — Size = pixel font size (6 to 60)
+local Name = {}
+Name.__index = Name
 local Utils, Config
-function Name.SetDependencies(u,c) Utils=u; Config=c end
+function Name.SetDependencies(u, c) Utils = u; Config = c end
 
 function Name.Create(player)
     local s = setmetatable({}, Name)
     s.Player = player
-    -- Outline=true uses Roblox built-in text outline (not a second drawing)
-    s.Text = Utils.NewDrawing("Text", {Text=player.Name, Size=13, Color=Color3.new(1,1,1), Outline=false, Center=true})
+    s.Text   = Utils.NewDrawing("Text", {Text=player.Name, Size=13, Color=Color3.new(1,1,1), Outline=false, Center=true})
     return s
 end
 
@@ -17,15 +18,15 @@ function Name:Update(char, cfg)
     if not top then return end
     local sp, on = Utils.W2V(top)
     if not on then return end
-    local sz = math.clamp(cfg.Size or 13, 6, 40)
+    local sz = math.clamp(math.floor(cfg.Size or 13), 6, 60)
     self.Text.Text     = self.Player.Name
     self.Text.Color    = Utils.C3(cfg.Color)
-    self.Text.Size     = sz
-    self.Text.Outline  = false    -- no outline = no black border
+    self.Text.Size     = sz      -- This IS the font pixel size in Drawing API
+    self.Text.Outline  = false
     self.Text.Position = Vector2.new(sp.X, sp.Y - (cfg.OffsetY or 5) - sz)
     self.Text.Visible  = true
 end
 
-function Name:Hide()   self.Text.Visible=false end
-function Name:Remove() Utils.Kill(self.Text)   end
+function Name:Hide()   self.Text.Visible = false end
+function Name:Remove() Utils.Kill(self.Text) end
 return Name
