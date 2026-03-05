@@ -1,7 +1,7 @@
 local Config = {}
-local HS = game:GetService("HttpService")
+local HS     = game:GetService("HttpService")
 local FOLDER = "NexusESP"
-local AUTO   = FOLDER.."/auto.json"
+local AUTO   = FOLDER .. "/auto.json"
 
 Config.Defaults = {
     Enabled=false, TeamCheck=true, VisibilityCheck=false, PerformanceMode=false,
@@ -20,23 +20,29 @@ Config.Defaults = {
 Config.Current = {}
 
 local function deepCopy(o)
-    if type(o)~="table" then return o end
-    local c={} for k,v in pairs(o) do c[deepCopy(k)]=deepCopy(v) end; return c
+    if type(o) ~= "table" then return o end
+    local c = {}
+    for k, v in pairs(o) do c[deepCopy(k)] = deepCopy(v) end
+    return c
 end
-local function merge(t,d)
-    for k,v in pairs(d) do
-        if type(v)=="table" then if type(t[k])~="table" then t[k]={} end; merge(t[k],v)
-        elseif t[k]==nil then t[k]=v end
+local function merge(t, d)
+    for k, v in pairs(d) do
+        if type(v) == "table" then
+            if type(t[k]) ~= "table" then t[k] = {} end
+            merge(t[k], v)
+        elseif t[k] == nil then
+            t[k] = v
+        end
     end
 end
 
-function Config.ToC3(t) return Color3.fromRGB(t and t.R or 255, t and t.G or 255, t and t.B or 255) end
-function Config.FromC3(c) return {R=math.floor(c.R*255),G=math.floor(c.G*255),B=math.floor(c.B*255)} end
+function Config.ToC3(t)  return Color3.fromRGB(t and t.R or 255, t and t.G or 255, t and t.B or 255) end
+function Config.FromC3(c) return {R=math.floor(c.R*255), G=math.floor(c.G*255), B=math.floor(c.B*255)} end
 
 function Config:Init()
     Config.Current = deepCopy(Config.Defaults)
     pcall(function()
-        if not isfolder(FOLDER)            then makefolder(FOLDER)            end
+        if not isfolder(FOLDER)              then makefolder(FOLDER) end
         if not isfolder(FOLDER.."/profiles") then makefolder(FOLDER.."/profiles") end
     end)
     Config:_load(AUTO)
@@ -45,9 +51,13 @@ end
 
 function Config:_load(path)
     local ok, raw = pcall(readfile, path)
-    if not ok or not raw or raw=="" then return false end
+    if not ok or not raw or raw == "" then return false end
     local ok2, dec = pcall(function() return HS:JSONDecode(raw) end)
-    if ok2 and type(dec)=="table" then merge(dec, Config.Defaults); Config.Current=dec; return true end
+    if ok2 and type(dec) == "table" then
+        merge(dec, Config.Defaults)
+        Config.Current = dec
+        return true
+    end
     return false
 end
 
@@ -56,16 +66,17 @@ function Config:_save(path)
     if ok then pcall(writefile, path, enc) end
 end
 
-function Config:Save()             Config:_save(AUTO)                         end
+function Config:Save()             Config:_save(AUTO) end
 function Config:SaveProfile(name)  Config:_save(FOLDER.."/profiles/"..name..".json"); Config:Save() end
 function Config:LoadProfile(name)  return Config:_load(FOLDER.."/profiles/"..name..".json") end
-function Config:Reset()            Config.Current=deepCopy(Config.Defaults); Config:Save() end
+function Config:Reset()            Config.Current = deepCopy(Config.Defaults); Config:Save() end
 
 function Config:ListProfiles()
-    local list={}
+    local list = {}
     pcall(function()
-        for _,f in ipairs(listfiles(FOLDER.."/profiles")) do
-            local n=f:match("([^/\\]+)%.json$"); if n then table.insert(list,n) end
+        for _, f in ipairs(listfiles(FOLDER.."/profiles")) do
+            local n = f:match("([^/\\]+)%.json$")
+            if n then table.insert(list, n) end
         end
     end)
     return list
