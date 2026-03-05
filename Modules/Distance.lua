@@ -1,6 +1,7 @@
-local Distance = {}; Distance.__index = Distance
+local Distance = {}
+Distance.__index = Distance
 local Utils, Config
-function Distance.SetDependencies(u,c) Utils=u; Config=c end
+function Distance.SetDependencies(u, c) Utils = u; Config = c end
 
 function Distance.Create()
     local s = setmetatable({}, Distance)
@@ -9,7 +10,7 @@ function Distance.Create()
 end
 
 function Distance:Update(char, cfg)
-    self.Text.Visible = false  -- always reset first
+    self.Text.Visible = false
     if not cfg or not cfg.Enabled or not char then return end
     local root = Utils.GetRoot(char)
     if not root then return end
@@ -19,17 +20,20 @@ function Distance:Update(char, cfg)
     if not top then return end
     local sp, on = Utils.W2V(top)
     if not on then return end
-    local nameSz = Config and Config.Current and Config.Current.Name and Config.Current.Name.Size or 13
-    local nameOff = Config and Config.Current and Config.Current.Name and Config.Current.Name.OffsetY or 5
-    local sz = math.clamp(cfg.Size or 11, 6, 30)
+    local nameCfg = Config and Config.Current and Config.Current.Name
+    local nameSz  = nameCfg and math.clamp(math.floor(nameCfg.Size or 13), 6, 60) or 13
+    local nameOff = nameCfg and (nameCfg.OffsetY or 5) or 5
+    local nameOn  = nameCfg and nameCfg.Enabled
+    local sz      = math.clamp(math.floor(cfg.Size or 11), 6, 40)
+    local posY    = sp.Y - nameOff - (nameOn and nameSz or 0) - sz - 4
     self.Text.Text     = Utils.FormatDist(dist)
     self.Text.Color    = Utils.C3(cfg.Color)
     self.Text.Size     = sz
     self.Text.Outline  = false
-    self.Text.Position = Vector2.new(sp.X, sp.Y - nameOff - nameSz - sz - 4)
+    self.Text.Position = Vector2.new(sp.X, posY)
     self.Text.Visible  = true
 end
 
-function Distance:Hide()   self.Text.Visible=false end
-function Distance:Remove() Utils.Kill(self.Text)   end
+function Distance:Hide()   self.Text.Visible = false end
+function Distance:Remove() Utils.Kill(self.Text) end
 return Distance
