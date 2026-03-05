@@ -1,6 +1,7 @@
-local Tracers = {}; Tracers.__index = Tracers
+local Tracers = {}
+Tracers.__index = Tracers
 local Utils, Config
-function Tracers.SetDependencies(u,c) Utils=u; Config=c end
+function Tracers.SetDependencies(u, c) Utils = u; Config = c end
 
 function Tracers.Create()
     local s = setmetatable({}, Tracers)
@@ -10,8 +11,8 @@ end
 
 local function origin(pos)
     local vp = Utils.GetViewport()
-    if pos=="Center" then return Vector2.new(vp.X/2, vp.Y/2)
-    elseif pos=="Top" then return Vector2.new(vp.X/2, 0)
+    if pos == "Center" then return Vector2.new(vp.X/2, vp.Y/2)
+    elseif pos == "Top" then return Vector2.new(vp.X/2, 0)
     else return Vector2.new(vp.X/2, vp.Y) end
 end
 
@@ -30,5 +31,5 @@ function Tracers:Update(char, cfg)
 end
 
 function Tracers:Hide()   self.Line.Visible = false end
-function Tracers:Remove() Utils.Kill(self.Line)     end
+function Tracers:Remove() Utils.Kill(self.Line) end
 return Tracers
