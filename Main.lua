@@ -2,7 +2,7 @@
 --   Aurora v3.1.3 — Main.lua
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.5"
+local VERSION = "3.1.6"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- Console silencieux (anti-détection)
