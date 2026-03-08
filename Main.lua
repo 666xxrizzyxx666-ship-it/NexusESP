@@ -5,7 +5,7 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.0.9"
+local VERSION = "3.1.0"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
@@ -260,6 +260,280 @@ end
 task.wait(0.5)
 if N.Notifications then
     N.Notifications.Success("Aurora v"..VERSION, "Chargé ! Appuie sur Insert 🚀", 5)
+end
+
+-- ── Contenu des tabs ──────────────────────────────────
+local F  = N.Framework
+local C  = N.Components
+local Cfg = N.Config
+
+if F and C then
+    -- ── ESP ───────────────────────────────────────────
+    local espSec = F.AddSection("ESP", "Joueurs")
+    if espSec and C.Toggle then
+        C.Toggle.New(espSec.container, {
+            label   = "Box ESP",
+            default = Cfg and Cfg.Current and Cfg.Current.Box and Cfg.Current.Box.Enabled or true,
+            onChange = function(v)
+                if Cfg then Cfg:Set("Box", {Enabled=v}) end
+                if N.ESP then N.ESP.SetOption("Box", v) end
+            end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Skeleton",
+            default = true,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Skeleton", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Tracers",
+            default = false,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Tracers", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Noms",
+            default = true,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Name", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Distance",
+            default = true,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Distance", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Santé",
+            default = true,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Health", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Chams",
+            default = false,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("Chams", v) end end,
+        })
+        C.Toggle.New(espSec.container, {
+            label   = "Team Check",
+            default = false,
+            onChange = function(v) if N.ESP then N.ESP.SetOption("TeamCheck", v) end end,
+        })
+    end
+
+    local espSec2 = F.AddSection("ESP", "Visibilité")
+    if espSec2 and C.Slider then
+        C.Slider.New(espSec2.container, {
+            label   = "Distance max",
+            min=100, max=2000, default=800, step=50,
+            format  = "%dm",
+            onChange = function(v) if N.ESP then N.ESP.SetOption("MaxDist", v) end end,
+        })
+    end
+
+    -- ── Combat ────────────────────────────────────────
+    local aimSec = F.AddSection("Combat", "Aimbot")
+    if aimSec and C.Toggle then
+        C.Toggle.New(aimSec.container, {
+            label   = "Aimbot",
+            default = false,
+            onChange = function(v) if N.Aimbot then N.Aimbot.Toggle() end end,
+        })
+        C.Toggle.New(aimSec.container, {
+            label   = "Silent Aim",
+            default = false,
+            onChange = function(v) if N.SilentAim then N.SilentAim.Toggle() end end,
+        })
+        C.Toggle.New(aimSec.container, {
+            label   = "Triggerbot",
+            default = false,
+            onChange = function(v) if N.Triggerbot then N.Triggerbot.Toggle() end end,
+        })
+        C.Toggle.New(aimSec.container, {
+            label   = "Recoil Control",
+            default = false,
+            onChange = function(v) if N.RecoilCtrl then N.RecoilCtrl.Toggle() end end,
+        })
+    end
+    if aimSec and C.Dropdown then
+        C.Dropdown.New(aimSec.container, {
+            label   = "Bone",
+            options = {"Head","HumanoidRootPart","UpperTorso"},
+            default = "Head",
+            onChange = function(v) if Cfg then Cfg:Set("Aimbot", {Bone=v}) end end,
+        })
+    end
+    if aimSec and C.Slider then
+        C.Slider.New(aimSec.container, {
+            label="FOV", min=10, max=360, default=100, step=5, format="%d°",
+            onChange = function(v) if Cfg then Cfg:Set("Aimbot", {FOV=v}) end end,
+        })
+        C.Slider.New(aimSec.container, {
+            label="Smoothness", min=1, max=50, default=10, step=1,
+            onChange = function(v) if Cfg then Cfg:Set("Aimbot", {Smoothness=v}) end end,
+        })
+    end
+
+    -- ── Movement ──────────────────────────────────────
+    local movSec = F.AddSection("Movement", "Déplacement")
+    if movSec and C.Toggle then
+        C.Toggle.New(movSec.container, {
+            label="Speed", default=false,
+            onChange = function(v) if N.Speed then N.Speed.Toggle() end end,
+        })
+        C.Toggle.New(movSec.container, {
+            label="Fly", default=false,
+            onChange = function(v) if N.Fly then N.Fly.Toggle() end end,
+        })
+        C.Toggle.New(movSec.container, {
+            label="Noclip", default=false,
+            onChange = function(v) if N.Noclip then N.Noclip.Toggle() end end,
+        })
+        C.Toggle.New(movSec.container, {
+            label="Bunny Hop", default=false,
+            onChange = function(v) if N.BunnyHop then N.BunnyHop.Toggle() end end,
+        })
+        C.Toggle.New(movSec.container, {
+            label="Infinite Jump", default=false,
+            onChange = function(v) if N.InfJump then N.InfJump.Toggle() end end,
+        })
+    end
+    if movSec and C.Slider then
+        C.Slider.New(movSec.container, {
+            label="Speed Value", min=16, max=200, default=50, step=2,
+            onChange = function(v) if N.Speed then N.Speed.SetSpeed(v) end end,
+        })
+        C.Slider.New(movSec.container, {
+            label="Fly Speed", min=10, max=300, default=80, step=5,
+            onChange = function(v) if N.Fly then N.Fly.SetSpeed(v) end end,
+        })
+    end
+
+    -- ── World ─────────────────────────────────────────
+    local worldSec = F.AddSection("World", "Environnement")
+    if worldSec and C.Toggle then
+        C.Toggle.New(worldSec.container, {
+            label="Full Bright", default=false,
+            onChange = function(v) if N.FullBright then N.FullBright.Toggle() end end,
+        })
+        C.Toggle.New(worldSec.container, {
+            label="No Fog", default=false,
+            onChange = function(v) if N.NoFog then N.NoFog.Toggle() end end,
+        })
+        C.Toggle.New(worldSec.container, {
+            label="Item ESP", default=false,
+            onChange = function(v) if N.ItemESP then N.ItemESP.Toggle() end end,
+        })
+    end
+
+    -- ── AI ────────────────────────────────────────────
+    local aiSec = F.AddSection("AI", "Intelligence Artificielle")
+    if aiSec and C.Toggle then
+        C.Toggle.New(aiSec.container, {
+            label="AI Aim", default=false,
+            onChange = function(v) if N.AimAI then N.AimAI.Toggle() end end,
+        })
+        C.Toggle.New(aiSec.container, {
+            label="Stealth Mode", default=false,
+            onChange = function(v) if N.StealthMode then N.StealthMode.Toggle() end end,
+        })
+    end
+    if aiSec and C.Slider then
+        C.Slider.New(aiSec.container, {
+            label="AI Blend", min=0, max=100, default=50, step=5, format="%d%%",
+            onChange = function(v)
+                if Cfg then Cfg:Set("Aimbot", {AIBlend=v/100}) end
+            end,
+        })
+    end
+    if aiSec and C.Label then
+        local prof = N.LearningEngine and N.LearningEngine.GetProfile()
+        local hitRate = prof and math.floor((prof.aim.hitRate or 0)*100) or 0
+        C.Label.New(aiSec.container, {text="Session #"..(prof and prof.sessions or 1).." — Hit rate : "..hitRate.."%"})
+    end
+
+    -- ── Bot ───────────────────────────────────────────
+    local botSec = F.AddSection("Bot", "Bot Autonome")
+    if botSec and C.Toggle then
+        C.Toggle.New(botSec.container, {
+            label="Bot Activé", default=false,
+            onChange = function(v) if N.BotCore then N.BotCore.Toggle() end end,
+        })
+    end
+    if botSec and C.Label then
+        C.Label.New(botSec.container, {text="⚠ Le bot joue de façon entièrement automatique"})
+    end
+
+    -- ── Utility ───────────────────────────────────────
+    local utilSec = F.AddSection("Utility", "Outils")
+    if utilSec and C.Toggle then
+        C.Toggle.New(utilSec.container, {
+            label="Anti AFK", default=true,
+            onChange = function(v)
+                if N.AntiAFK then
+                    if v then N.AntiAFK.Enable() else N.AntiAFK.Disable() end
+                end
+            end,
+        })
+        C.Toggle.New(utilSec.container, {
+            label="FPS Unlock", default=false,
+            onChange = function(v)
+                if N.FPSUnlock then
+                    if v then N.FPSUnlock.Enable(144) else N.FPSUnlock.Disable() end
+                end
+            end,
+        })
+        C.Toggle.New(utilSec.container, {
+            label="Remote Spy", default=false,
+            onChange = function(v)
+                if N.RemoteSpy then
+                    if v then N.RemoteSpy.Enable() else N.RemoteSpy.Disable() end
+                end
+            end,
+        })
+        C.Toggle.New(utilSec.container, {
+            label="Admin Detector", default=true,
+            onChange = function(v)
+                if N.AdminDetector then
+                    if v then N.AdminDetector.Enable() else N.AdminDetector.Disable() end
+                end
+            end,
+        })
+    end
+    if utilSec and C.Button then
+        C.Button.New(utilSec.container, {
+            label="Server Hop",
+            onClick = function() if N.ServerHop then N.ServerHop.Hop() end end,
+        })
+    end
+
+    -- ── Config ────────────────────────────────────────
+    local cfgSec = F.AddSection("Config", "Profils")
+    if cfgSec and C.Button then
+        C.Button.New(cfgSec.container, {
+            label="Sauvegarder le profil",
+            onClick = function()
+                if N.Profiles and Cfg then
+                    N.Profiles.Save("Default", Cfg.Current)
+                    if N.Notifications then N.Notifications.Success("Config", "Profil sauvegardé ✓") end
+                end
+            end,
+        })
+        C.Button.New(cfgSec.container, {
+            label="Reset profil",
+            onClick = function()
+                if N.Profiles then
+                    N.Profiles.Reset("Default")
+                    if N.Notifications then N.Notifications.Info("Config", "Profil réinitialisé") end
+                end
+            end,
+        })
+    end
+    if cfgSec and C.Toggle then
+        C.Toggle.New(cfgSec.container, {
+            label="Watermark", default=true,
+            onChange = function(v) if N.Watermark then N.Watermark.Toggle() end end,
+        })
+    end
+    if cfgSec and C.Label then
+        C.Label.New(cfgSec.container, {text="Touche panique : DELETE"})
+        C.Label.New(cfgSec.container, {text="Ouvrir/Fermer : INSERT"})
+    end
 end
 
 print("╔══════════════════════════════╗")
