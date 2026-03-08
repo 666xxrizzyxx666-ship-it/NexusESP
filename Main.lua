@@ -2,13 +2,14 @@
 --   Aurora v3.1.3 — Main.lua
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.4"
+local VERSION = "3.1.5"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
-print("╔══════════════════════════════╗")
-print("║  Aurora v"..VERSION.."          ║")
-print("║  Loading...                  ║")
-print("╚══════════════════════════════╝")
+-- Console silencieux (anti-détection)
+local _log = {}
+local function _p(msg) table.insert(_log,{t=os.clock(),m=tostring(msg)}) end
+local function _w(msg) table.insert(_log,{t=os.clock(),m="[!] "..tostring(msg)}) end
+_p("Aurora v"..VERSION.." — Init")
 
 -- ── Loader ────────────────────────────────────────────
 local function load(path)
@@ -16,7 +17,7 @@ local function load(path)
         return loadstring(game:HttpGet(REPO..path, true))()
     end)
     if not ok then
-        warn("[Aurora] Erreur : "..path.." → "..tostring(result))
+        _w("[Aurora] Erreur : "..path.." → "..tostring(result))
         return nil
     end
     return result
@@ -33,7 +34,7 @@ getgenv().NexusESP = {}
 local N = getgenv().NexusESP
 
 -- ── Phase 1 : Core ────────────────────────────────────
-print("[Aurora] Core...")
+_p("[Aurora] Core...")
 progress(0.08, "Core...")
 N.Signal   = load("Core/Signal.lua")
 N.EventBus = load("Core/EventBus.lua")
@@ -42,7 +43,7 @@ N.Memory   = load("Core/Memory.lua")
 if N.EventBus then N.EventBus.Init() end
 
 -- ── Phase 2 : Config ──────────────────────────────────
-print("[Aurora] Config...")
+_p("[Aurora] Config...")
 progress(0.15, "Config...")
 N.Profiles = load("Config/Profiles.lua")
 N.Config   = load("Config/Manager.lua")
@@ -54,7 +55,7 @@ if N.Config   then
 end
 
 -- ── Phase 3 : Network / Key ───────────────────────────
-print("[Aurora] Network/Key...")
+_p("[Aurora] Network/Key...")
 progress(0.22, "Réseau...")
 -- Firebase chargé mais jamais bloquant
 pcall(function() N.Firebase = load("Network/Firebase.lua") end)
@@ -80,7 +81,7 @@ end)
 N.Utils = load("Modules/Utils.lua")
 
 -- ── Phase 5 : UI ──────────────────────────────────────
-print("[Aurora] UI...")
+_p("[Aurora] UI...")
 progress(0.35, "Interface...")
 N.Theme         = load("UI/Theme.lua")
 N.Animation     = load("UI/Animation.lua")
@@ -123,7 +124,7 @@ if N.Framework then
 end
 
 -- ── Phase 6 : AI ──────────────────────────────────────
-print("[Aurora] AI...")
+_p("[Aurora] AI...")
 progress(0.50, "Intelligence Artificielle...")
 N.LearningEngine = load("AI/Core/LearningEngine.lua")
 N.PatternEngine  = load("AI/Core/PatternEngine.lua")
@@ -150,7 +151,7 @@ if N.PerfectHuman   then N.PerfectHuman.Init(aiDeps)   end
 if N.BotCore        then N.BotCore.Init(aiDeps)        end
 
 -- ── Phase 7 : ESP ─────────────────────────────────────
-print("[Aurora] ESP...")
+_p("[Aurora] ESP...")
 progress(0.65, "ESP...")
 N.ESP = load("Modules/ESP/ESP.lua")
 if N.ESP then
@@ -160,7 +161,7 @@ if N.ESP then
 end
 
 -- ── Phase 8 : Combat ──────────────────────────────────
-print("[Aurora] Combat...")
+_p("[Aurora] Combat...")
 progress(0.75, "Combat...")
 N.Aimbot     = load("Modules/Combat/Aimbot.lua")
 N.SilentAim  = load("Modules/Combat/SilentAim.lua")
@@ -175,7 +176,7 @@ if N.RecoilCtrl then N.RecoilCtrl.Init(cDeps)  end
 if N.Humanizer  then N.Humanizer.Init(cDeps)   end
 
 -- ── Phase 9 : Movement ────────────────────────────────
-print("[Aurora] Movement...")
+_p("[Aurora] Movement...")
 progress(0.82, "Mouvement...")
 N.Speed       = load("Modules/Movement/Speed.lua")
 N.Fly         = load("Modules/Movement/Fly.lua")
@@ -194,7 +195,7 @@ if N.Teleport    then N.Teleport.Init(mDeps)    end
 if N.AntiRagdoll then N.AntiRagdoll.Init(mDeps) end
 
 -- ── Phase 10 : World / Utility ────────────────────────
-print("[Aurora] World/Utility...")
+_p("[Aurora] World/Utility...")
 progress(0.90, "World & Utility...")
 N.FullBright    = load("Modules/World/FullBright.lua")
 N.NoFog         = load("Modules/World/NoFog.lua")
@@ -225,7 +226,7 @@ if N.FPSUnlock and N.Config.Current.FPSUnlock and N.Config.Current.FPSUnlock.Ena
 end
 
 -- ── Phase 11 : Security finale ────────────────────────
-print("[Aurora] Security...")
+_p("[Aurora] Security...")
 N.PanicKey    = load("Security/PanicKey.lua")
 N.StealthMode = load("Security/StealthMode.lua")
 local sDeps   = {Config=N.Config, AdminDetector=N.AdminDetector, Notify=N.Notifications}
@@ -252,12 +253,12 @@ if N.AdminDetector then
 end
 
 -- ── Phase 12 : Game Specific ──────────────────────────
-print("[Aurora] Game Specific...")
+_p("[Aurora] Game Specific...")
 N.GameDetector = load("Game/Detector.lua")
 if N.GameDetector then
     N.GameDetector.Init({Notify=N.Notifications, Utils=N.Utils})
     local gameId = N.GameDetector.Detect()
-    print("[Aurora] Jeu : "..tostring(gameId))
+    _p("[Aurora] Jeu : "..tostring(gameId))
 
     local gMod
     if     gameId == "DaHood"        then gMod = load("Game/Games/DaHood/Init.lua")
@@ -363,6 +364,27 @@ if F and C then
         })
     end
 
+    -- ItemESP dans tab ESP
+    local espSec3 = F.AddSection("ESP", "Objets & Monde")
+    if espSec3 and C.Toggle then
+        C.Toggle.new(espSec3.container, {
+            label="Item ESP", default=false,
+            onChange=function(v) if N.ItemESP then N.ItemESP.Toggle() end end,
+        })
+        C.Toggle.new(espSec3.container, {
+            label="No Fog", default=false,
+            onChange=function(v) if N.NoFog then N.NoFog.Toggle() end end,
+        })
+        C.Toggle.new(espSec3.container, {
+            label="Full Bright", default=false,
+            onChange=function(v)
+                if N.FullBright then
+                    if v then N.FullBright.Enable() else N.FullBright.Disable() end
+                end
+            end,
+        })
+    end
+
     -- ── Combat ────────────────────────────────────────
     local aimSec = F.AddSection("Combat", "Aimbot")
     if aimSec and C.Toggle then
@@ -433,31 +455,16 @@ if F and C then
     if movSec and C.Slider then
         C.Slider.new(movSec.container, {
             label="Speed Value", min=16, max=200, default=50, step=2,
-            onChange = function(v) if N.Speed then N.Speed.SetSpeed(v) end end,
+            onChange = function(v) if N.Speed then pcall(N.Speed.SetSpeed or N.Speed.SetValue, v) end end,
         })
         C.Slider.new(movSec.container, {
             label="Fly Speed", min=10, max=300, default=80, step=5,
-            onChange = function(v) if N.Fly then N.Fly.SetSpeed(v) end end,
+            onChange = function(v) if N.Fly then pcall(function() N.Fly.SetSpeed(v) end) end end,
         })
     end
 
     -- ── World ─────────────────────────────────────────
     local worldSec = F.AddSection("World", "Environnement")
-    if worldSec and C.Toggle then
-        C.Toggle.new(worldSec.container, {
-            label="Full Bright", default=false,
-            onChange = function(v) if N.FullBright then N.FullBright.Toggle() end end,
-        })
-        C.Toggle.new(worldSec.container, {
-            label="No Fog", default=false,
-            onChange = function(v) if N.NoFog then N.NoFog.Toggle() end end,
-        })
-        C.Toggle.new(worldSec.container, {
-            label="Item ESP", default=false,
-            onChange = function(v) if N.ItemESP then N.ItemESP.Toggle() end end,
-        })
-    end
-
     -- ── AI ────────────────────────────────────────────
     local aiSec = F.AddSection("AI", "Intelligence Artificielle")
     if aiSec and C.Toggle then
@@ -573,6 +580,4 @@ if F and C then
     end
 end
 
-print("╔══════════════════════════════╗")
-print("║  Aurora v"..VERSION.." — PRÊT  ║")
-print("╚══════════════════════════════╝")
+_p("Aurora v"..VERSION.." — PRÊT")
