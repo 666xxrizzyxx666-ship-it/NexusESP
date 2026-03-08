@@ -142,19 +142,14 @@ end
 local function switchTab(name)
     if activeTab == name then return end
 
-    -- Désactive ancien tab
+    -- Cache IMMÉDIATEMENT l'ancien (pas de transition qui overlap)
     if activeTab and tabs[activeTab] then
         local old = tabs[activeTab]
         old.active = false
+        if old.content then old.content.Visible = false end
         T(old.btn,{BackgroundTransparency=1},0.18)
         T(old.btnTxt,{TextColor3=P.TEXTMUTE},0.18)
         if old.indicator then T(old.indicator,{BackgroundTransparency=1},0.18) end
-        if old.content then
-            T(old.content,{BackgroundTransparency=1},0.15)
-            task.delay(0.18,function()
-                if old.content then old.content.Visible=false end
-            end)
-        end
     end
 
     activeTab = name
@@ -162,14 +157,15 @@ local function switchTab(name)
     if not t then return end
     t.active = true
 
+    -- Affiche le nouveau avec fade in
+    if t.content then
+        t.content.BackgroundTransparency = 1
+        t.content.Visible = true
+        T(t.content,{BackgroundTransparency=0},0.25)
+    end
     T(t.btn,{BackgroundTransparency=0.86},0.2)
     T(t.btnTxt,{TextColor3=P.TEXT},0.2)
     if t.indicator then T(t.indicator,{BackgroundTransparency=0},0.2) end
-    if t.content then
-        t.content.Visible = true
-        t.content.BackgroundTransparency = 1
-        T(t.content,{BackgroundTransparency=0},0.22)
-    end
 end
 
 -- ── Build UI ──────────────────────────────────────────
@@ -500,12 +496,15 @@ function Framework.AddSection(tabName, title)
     },sec)
     mk("Frame",{
         BackgroundColor3=P.ACCENT,BorderSizePixel=0,
-        BackgroundTransparency=0.5,
+        BackgroundTransparency=0.4,
         Size=UDim2.fromOffset(3,14),
         Position=UDim2.new(0,12,0.5,-7),ZIndex=10,
     },sh)
-    local lf = Instance.new("UICorner",sh:FindFirstChild("Frame") or sh)
-    lf.CornerRadius = UDim.new(1,0)
+    -- corner on accent line handled by mk then corner()
+    do
+        local acLine = sh:FindFirstChildOfClass("Frame")
+        if acLine then corner(acLine, UDim.new(1,0)) end
+    end
 
     mk("TextLabel",{
         Text=title,Font=Enum.Font.GothamBold,TextSize=11,
