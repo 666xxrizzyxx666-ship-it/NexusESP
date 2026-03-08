@@ -296,4 +296,36 @@ function KeySystem.Hide()
     if gui then gui:Destroy(); gui = nil end
 end
 
+-- ── Validate synchrone pour Main.lua ─────────────────
+function KeySystem.Validate()
+    -- Dev mode : Firebase absent → bypass automatique
+    local ok, fb = pcall(function()
+        return getgenv().NexusESP and getgenv().NexusESP.Firebase
+    end)
+    if not ok or not fb then
+        print("[KeySystem] Dev mode — bypass ✓")
+        return true
+    end
+    -- Owner bypass
+    if BYPASS_USERID[LP.UserId] then
+        print("[KeySystem] Owner bypass ✓")
+        return true
+    end
+    -- Clé sauvegardée
+    local savedKey = nil
+    pcall(function() savedKey = readfile(KEY_FILE) end)
+    if savedKey and savedKey ~= "" then
+        local vok, result = pcall(function() return fb.ValidateKey(savedKey) end)
+        if vok and result then
+            print("[KeySystem] Clé valide ✓")
+            return true
+        end
+    end
+    -- Affiche l'écran sans bloquer
+    task.spawn(function()
+        KeySystem.Show(function() end)
+    end)
+    return true
+end
+
 return KeySystem
