@@ -5,7 +5,7 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.0.7"
+local VERSION = "3.0.8"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
