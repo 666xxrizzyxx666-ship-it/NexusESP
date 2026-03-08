@@ -2,7 +2,7 @@
 --   Aurora v3.1.3 — Main.lua
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.6"
+local VERSION = "3.2.0"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- Console silencieux (anti-détection)
@@ -153,7 +153,8 @@ if N.BotCore        then N.BotCore.Init(aiDeps)        end
 -- ── Phase 7 : ESP ─────────────────────────────────────
 _p("[Aurora] ESP...")
 progress(0.65, "ESP...")
-N.ESP = load("Modules/ESP/ESP.lua")
+N.ESP   = load("Modules/ESP/ESP.lua")
+pcall(function() N.Chams = load("Modules/ESP/Chams.lua") end)
 if N.ESP then
     N.ESP.Init({Utils=N.Utils, Config=N.Config, EventBus=N.EventBus})
     -- ESP désactivé par défaut au lancement
@@ -345,7 +346,11 @@ if F and C then
         C.Toggle.new(espSec.container, {
             label   = "Chams",
             default = false,
-            onChange = function(v) if N.ESP then N.ESP.SetOption("Chams", v) end end,
+            onChange = function(v)
+                if N.Chams then
+                    if v then N.Chams.Enable() else N.Chams.Disable() end
+                end
+            end,
         })
         C.Toggle.new(espSec.container, {
             label   = "Team Check",
