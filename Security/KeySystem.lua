@@ -82,16 +82,23 @@ function KeySystem.Show(callback)
     overlay.BorderSizePixel        = 0
     overlay.Size                   = UDim2.fromScale(1,1)
 
-    -- ── Fenêtre UNIQUE (pas de header séparé) ─────────
-    local win = Instance.new("Frame", gui)
+    -- ── Fenêtre UNIQUE ────────────────────────────────
+    -- Bordure via frame parente (évite le trait UIStroke)
+    local winBorder = Instance.new("Frame", gui)
+    winBorder.BackgroundColor3 = C(91,107,248)
+    winBorder.BorderSizePixel  = 0
+    winBorder.Size             = UDim2.fromOffset(402, 292)
+    winBorder.Position         = UDim2.new(0.5,0,0.6,0)
+    winBorder.AnchorPoint      = Vector2.new(0.5,0.5)
+    mkCorner(winBorder, UDim.new(0,15))
+
+    local win = Instance.new("Frame", winBorder)
     win.BackgroundColor3   = C(10,10,18)
     win.BorderSizePixel    = 0
     win.Size               = UDim2.fromOffset(400, 290)
-    win.Position           = UDim2.new(0.5,0,0.6,0)
-    win.AnchorPoint        = Vector2.new(0.5,0.5)
+    win.Position           = UDim2.fromOffset(1,1)
     win.ClipsDescendants   = true
     mkCorner(win, UDim.new(0,14))
-    mkStroke(win, C(91,107,248), 1)
 
     -- Gradient de fond (header intégré, pas de frame séparée)
     local grad = Instance.new("UIGradient", win)
@@ -112,11 +119,24 @@ function KeySystem.Show(callback)
 
     -- Icône maison (asset simple dispo partout)
     local logoImg = Instance.new("ImageLabel", win)
-    logoImg.Image                  = "rbxassetid://6764432408"
+    logoImg.Image = "rbxassetid://4483345998"
     logoImg.BackgroundTransparency = 1
     logoImg.Size                   = UDim2.fromOffset(32,32)
     logoImg.Position               = UDim2.fromOffset(22,16)
-    logoImg.ImageColor3            = C(91,107,248)
+    logoImg.ImageColor3 = C(91,107,248)
+    logoImg.ImageTransparency = 1  -- cache si asset invalide
+
+    -- Logo texte "A" fiable (fonctionne partout)
+    local logoTxt = Instance.new("TextLabel", win)
+    logoTxt.Text = "A"
+    logoTxt.Font = Enum.Font.GothamBold
+    logoTxt.TextSize = 22
+    logoTxt.TextColor3 = Color3.new(1,1,1)
+    logoTxt.BackgroundColor3 = C(91,107,248)
+    logoTxt.BorderSizePixel = 0
+    logoTxt.Size = UDim2.fromOffset(36,36)
+    logoTxt.Position = UDim2.fromOffset(14,14)
+    mkCorner(logoTxt, UDim.new(0,8))
 
     -- Titre "Aurora"
     local title = Instance.new("TextLabel", win)
@@ -280,9 +300,9 @@ function KeySystem.Show(callback)
     end)
 
     -- Animation entrée
-    TweenS:Create(win,
+    TweenS:Create(winBorder,
         TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Position = UDim2.fromScale(0.5,0.5)}
+        {Position = UDim2.new(0.5,0,0.5,0)}
     ):Play()
 end
 
