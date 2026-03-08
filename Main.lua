@@ -5,7 +5,7 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.1"
+local VERSION = "3.1.2"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
@@ -274,7 +274,7 @@ if F and C then
     if espSec and C.Toggle then
         C.Toggle.new(espSec.container, {
             label   = "Box ESP",
-            default = Cfg and Cfg.Current and Cfg.Current.Box and Cfg.Current.Box.Enabled or true,
+            default = false,
             onChange = function(v)
                 if Cfg then Cfg:Set("Box", {Enabled=v}) end
                 if N.ESP then N.ESP.SetOption("Box", v) end
@@ -292,17 +292,17 @@ if F and C then
         })
         C.Toggle.new(espSec.container, {
             label   = "Noms",
-            default = true,
+            default = false,
             onChange = function(v) if N.ESP then N.ESP.SetOption("Name", v) end end,
         })
         C.Toggle.new(espSec.container, {
             label   = "Distance",
-            default = true,
+            default = false,
             onChange = function(v) if N.ESP then N.ESP.SetOption("Distance", v) end end,
         })
         C.Toggle.new(espSec.container, {
             label   = "Santé",
-            default = true,
+            default = false,
             onChange = function(v) if N.ESP then N.ESP.SetOption("Health", v) end end,
         })
         C.Toggle.new(espSec.container, {
