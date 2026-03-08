@@ -60,7 +60,7 @@ function ESP.Init(deps)
         ESP._removePlayer(p)
     end)
 
-    print("[ESP] Initialisé ✓")
+    task.defer(function()end)
 end
 
 -- ── Ajouter joueur ────────────────────────────────────
@@ -243,7 +243,7 @@ function ESP.Enable()
     if enabled then return end
     enabled    = true
     renderConn = RunService.RenderStepped:Connect(ESP._render)
-    print("[ESP] Activé")
+    task.defer(function()end)
 end
 
 function ESP.Disable()
@@ -254,7 +254,7 @@ function ESP.Disable()
     for player, data in pairs(playerData) do
         ESP._hideAll(data)
     end
-    print("[ESP] Désactivé")
+    task.defer(function()end)
 end
 
 function ESP.Toggle()
@@ -279,13 +279,20 @@ end
 
 -- SetOption — modifie une option à la volée
 function ESP.SetOption(key, value)
-    if Config and Config.Current then
-        local current = Config.Current[key]
-        if type(current) == "table" then
-            current.Enabled = value
-        else
-            Config.Current[key] = value
-        end
+    if not Config or not Config.Current then return end
+    -- MaxDist est dans Distance.MaxDist
+    if key == "MaxDist" then
+        Config.Current.Distance = Config.Current.Distance or {}
+        Config.Current.Distance.MaxDist = value
+        return
+    end
+    -- Enabled flags
+    local target = Config.Current[key]
+    if type(target) == "table" then
+        target.Enabled = value
+    else
+        -- Crée la structure si besoin
+        Config.Current[key] = {Enabled=value}
     end
 end
 
