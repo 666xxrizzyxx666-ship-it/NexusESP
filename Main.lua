@@ -1,18 +1,16 @@
 -- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Main.lua
---   📁 Racine du projet
---   Rôle : Point d'entrée principal
---          Charge et connecte tous les modules
+--   Aurora v3.1.3 — Main.lua
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.3"
+local VERSION = "3.1.4"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
-print("║  Aurora v"..VERSION.."           ║")
+print("║  Aurora v"..VERSION.."          ║")
 print("║  Loading...                  ║")
 print("╚══════════════════════════════╝")
 
+-- ── Loader ────────────────────────────────────────────
 local function load(path)
     local ok, result = pcall(function()
         return loadstring(game:HttpGet(REPO..path, true))()
@@ -24,11 +22,19 @@ local function load(path)
     return result
 end
 
+-- ── Loading Screen (immédiat, avant tout) ─────────────
+local LS = load("UI/LoadingScreen.lua")
+if LS then LS.Show(VERSION) end
+local function progress(pct, txt)
+    if LS then pcall(LS.SetProgress, pct, txt) end
+end
+
 getgenv().NexusESP = {}
 local N = getgenv().NexusESP
 
 -- ── Phase 1 : Core ────────────────────────────────────
 print("[Aurora] Core...")
+progress(0.08, "Core...")
 N.Signal   = load("Core/Signal.lua")
 N.EventBus = load("Core/EventBus.lua")
 N.Thread   = load("Core/Thread.lua")
@@ -37,6 +43,7 @@ if N.EventBus then N.EventBus.Init() end
 
 -- ── Phase 2 : Config ──────────────────────────────────
 print("[Aurora] Config...")
+progress(0.15, "Config...")
 N.Profiles = load("Config/Profiles.lua")
 N.Config   = load("Config/Manager.lua")
 if N.Profiles then N.Profiles.Init() end
@@ -48,6 +55,7 @@ end
 
 -- ── Phase 3 : Network / Key ───────────────────────────
 print("[Aurora] Network/Key...")
+progress(0.22, "Réseau...")
 -- Firebase chargé mais jamais bloquant
 pcall(function() N.Firebase = load("Network/Firebase.lua") end)
 pcall(function() N.Updater  = load("Network/Updater.lua")  end)
@@ -73,6 +81,7 @@ N.Utils = load("Modules/Utils.lua")
 
 -- ── Phase 5 : UI ──────────────────────────────────────
 print("[Aurora] UI...")
+progress(0.35, "Interface...")
 N.Theme         = load("UI/Theme.lua")
 N.Animation     = load("UI/Animation.lua")
 N.Notifications = load("UI/Notifications.lua")
@@ -115,6 +124,7 @@ end
 
 -- ── Phase 6 : AI ──────────────────────────────────────
 print("[Aurora] AI...")
+progress(0.50, "Intelligence Artificielle...")
 N.LearningEngine = load("AI/Core/LearningEngine.lua")
 N.PatternEngine  = load("AI/Core/PatternEngine.lua")
 N.DecisionTree   = load("AI/Core/DecisionTree.lua")
@@ -141,6 +151,7 @@ if N.BotCore        then N.BotCore.Init(aiDeps)        end
 
 -- ── Phase 7 : ESP ─────────────────────────────────────
 print("[Aurora] ESP...")
+progress(0.65, "ESP...")
 N.ESP = load("Modules/ESP/ESP.lua")
 if N.ESP then
     N.ESP.Init({Utils=N.Utils, Config=N.Config, EventBus=N.EventBus})
@@ -150,6 +161,7 @@ end
 
 -- ── Phase 8 : Combat ──────────────────────────────────
 print("[Aurora] Combat...")
+progress(0.75, "Combat...")
 N.Aimbot     = load("Modules/Combat/Aimbot.lua")
 N.SilentAim  = load("Modules/Combat/SilentAim.lua")
 N.Triggerbot = load("Modules/Combat/Triggerbot.lua")
@@ -164,6 +176,7 @@ if N.Humanizer  then N.Humanizer.Init(cDeps)   end
 
 -- ── Phase 9 : Movement ────────────────────────────────
 print("[Aurora] Movement...")
+progress(0.82, "Mouvement...")
 N.Speed       = load("Modules/Movement/Speed.lua")
 N.Fly         = load("Modules/Movement/Fly.lua")
 N.Noclip      = load("Modules/Movement/Noclip.lua")
@@ -182,6 +195,7 @@ if N.AntiRagdoll then N.AntiRagdoll.Init(mDeps) end
 
 -- ── Phase 10 : World / Utility ────────────────────────
 print("[Aurora] World/Utility...")
+progress(0.90, "World & Utility...")
 N.FullBright    = load("Modules/World/FullBright.lua")
 N.NoFog         = load("Modules/World/NoFog.lua")
 N.ItemESP       = load("Modules/World/ItemESP.lua")
@@ -259,9 +273,22 @@ if N.GameDetector then
 end
 
 -- ── Prêt ──────────────────────────────────────────────
-task.wait(0.5)
-if N.Notifications then
-    N.Notifications.Success("Aurora v"..VERSION, "Chargé ! Appuie sur Insert 🚀", 5)
+progress(0.98, "Prêt !")
+task.wait(0.4)
+
+-- Ferme le loading screen → ouvre l'UI
+if LS then
+    LS.Hide(function()
+        -- UI s'ouvre après fermeture loading
+        if N.Framework then N.Framework.Show() end
+        if N.Notifications then
+            N.Notifications.Success("Aurora v"..VERSION, "Chargé ! Appuie sur Insert 🚀", 5)
+        end
+    end)
+else
+    if N.Notifications then
+        N.Notifications.Success("Aurora v"..VERSION, "Chargé ! Appuie sur Insert 🚀", 5)
+    end
 end
 
 -- ── Contenu des tabs ──────────────────────────────────
