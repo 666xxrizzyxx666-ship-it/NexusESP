@@ -1,99 +1,104 @@
--- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Modules/ESP/Chams.lua
---   📁 Dossier : Modules/ESP/
---   Rôle : Chams (highlight through walls)
--- ══════════════════════════════════════════════════════
-
+-- Aurora v3.2.0 — Modules/ESP/Chams.lua
 local Chams = {}
+local Players    = game:GetService("Players")
+local LP         = Players.LocalPlayer
+local enabled    = false
+local chamData   = {}
+local COLOR_TEAM = Color3.fromRGB(74,222,128)
+local COLOR_ENEMY= Color3.fromRGB(248,113,113)
 
-local Players = game:GetService("Players")
-local LP      = Players.LocalPlayer
+local function getTeam(player)
+    local ok,r = pcall(function() return player.Team end)
+    return ok and r or nil
+end
 
-local activeChams = {}
-
-local function applyChams(char, cfg)
+local function applyChams(player)
+    local char = player.Character
     if not char then return end
-    local color     = cfg.Color     and Color3.fromRGB(cfg.Color.R,     cfg.Color.G,     cfg.Color.B)     or Color3.fromRGB(255,0,0)
-    local fillColor = cfg.FillColor and Color3.fromRGB(cfg.FillColor.R, cfg.FillColor.G, cfg.FillColor.B) or Color3.fromRGB(0,0,255)
-    local trans     = cfg.Transparent or 0.5
+    chamData[player] = chamData[player] or {}
+    local isEnemy = getTeam(player) ~= getTeam(LP)
+    local col = isEnemy and COLOR_ENEMY or COLOR_TEAM
 
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            local box = Instance.new("SelectionBox")
-            box.Adornee           = part
-            box.Color3            = color
-            box.SurfaceColor3     = fillColor
-            box.SurfaceTransparency = trans
-            box.LineThickness     = 0.02
-            box.Parent            = workspace
-            table.insert(activeChams, box)
+            -- Sauvegarde l'original
+            if not chamData[player][part] then
+                chamData[player][part] = {
+                    material = part.Material,
+                    color    = part.BrickColor,
+                    trans    = part.Transparency,
+                    castShadow = part.CastShadow,
+                }
+            end
+            part.Material    = Enum.Material.Neon
+            part.BrickColor  = BrickColor.new(col)
+            part.Transparency = 0.35
+            part.CastShadow  = false
         end
     end
 end
 
-local function clearChams(player)
-    local data = activeChams[player]
+local function removeChams(player)
+    local data = chamData[player]
     if not data then return end
-    for _, box in ipairs(data) do
-        pcall(function() box:Destroy() end)
-    end
-    activeChams[player] = nil
-end
-
-function Chams.Create()
-    return {active = false, boxes = {}}
-end
-
-function Chams.Update(d, char, cfg)
-    if not d or not char then return end
-
-    if d.active then return end
-    d.active = true
-
-    -- Nettoie les anciens
-    for _, box in ipairs(d.boxes) do
-        pcall(function() box:Destroy() end)
-    end
-    d.boxes = {}
-
-    local color     = cfg.Color     and Color3.fromRGB(cfg.Color.R,     cfg.Color.G,     cfg.Color.B)     or Color3.fromRGB(255,60,60)
-    local fillColor = cfg.FillColor and Color3.fromRGB(cfg.FillColor.R, cfg.FillColor.G, cfg.FillColor.B) or Color3.fromRGB(60,60,255)
-    local trans     = cfg.Transparent or 0.5
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            local ok, box = pcall(function()
-                local b = Instance.new("SelectionBox")
-                b.Adornee             = part
-                b.Color3              = color
-                b.SurfaceColor3       = fillColor
-                b.SurfaceTransparency = trans
-                b.LineThickness       = 0.02
-                b.Parent              = workspace
-                return b
-            end)
-            if ok then
-                table.insert(d.boxes, box)
+    local char = player.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and data[part] then
+                local orig = data[part]
+                pcall(function()
+                    part.Material    = orig.material
+                    part.BrickColor  = orig.color
+                    part.Transparency = orig.trans
+                    part.CastShadow  = orig.castShadow
+                end)
             end
         end
     end
+    chamData[player] = nil
 end
 
-function Chams.Hide(d)
-    if not d then return end
-    for _, box in ipairs(d.boxes) do
-        pcall(function() box.Visible = false end)
+function Chams.Init(deps) end
+
+function Chams.Enable()
+    if enabled then return end
+    enabled = true
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            pcall(applyChams, p)
+            p.CharacterAdded:Connect(function()
+                task.wait(0.5)
+                if enabled then pcall(applyChams, p) end
+            end)
+        end
     end
-    d.active = false
+    Players.PlayerAdded:Connect(function(p)
+        if not enabled then return end
+        p.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if enabled then pcall(applyChams, p) end
+        end)
+    end)
 end
 
-function Chams.Remove(d)
-    if not d then return end
-    for _, box in ipairs(d.boxes) do
-        pcall(function() box:Destroy() end)
+function Chams.Disable()
+    if not enabled then return end
+    enabled = false
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then pcall(removeChams, p) end
     end
-    d.boxes  = {}
-    d.active = false
 end
 
+function Chams.Toggle()
+    if enabled then Chams.Disable() else Chams.Enable() end
+end
+
+function Chams.SetColor(isTeam, col)
+    if isTeam then COLOR_TEAM = col else COLOR_ENEMY = col end
+    if enabled then
+        Chams.Disable(); task.wait(0.05); Chams.Enable()
+    end
+end
+
+function Chams.IsEnabled() return enabled end
 return Chams
