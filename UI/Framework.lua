@@ -254,6 +254,21 @@ function Framework.Init(deps)
     end
 
     Framework._buildGui()
+
+    -- ── Tabs par défaut ───────────────────────────────
+    local defaultTabs = {
+        {"ESP",      "👁"},
+        {"Combat",   "🎯"},
+        {"Movement", "🏃"},
+        {"World",    "🌍"},
+        {"AI",       "🧠"},
+        {"Bot",      "🤖"},
+        {"Utility",  "🔧"},
+        {"Config",   "⚙"},
+    }
+    for _, t in ipairs(defaultTabs) do
+        Framework.AddTab(t[1], t[2])
+    end
 end
 
 function Framework._buildGui()
@@ -311,7 +326,7 @@ function Framework._buildGui()
 
     -- Logo
     local logo = Instance.new("TextLabel", header)
-    logo.Text               = "🔮  NexusESP"
+    logo.Text               = "✦  Aurora"
     logo.Font               = Theme.Fonts.Bold
     logo.TextSize           = Theme.TextSize.Logo
     logo.TextColor3         = Theme.Colors.Accent
@@ -322,7 +337,7 @@ function Framework._buildGui()
 
     -- Version
     local ver = Instance.new("TextLabel", header)
-    ver.Text                = "v3.0.0"
+    ver.Text                = "v3.0.9"
     ver.Font                = Theme.Fonts.Regular
     ver.TextSize            = Theme.TextSize.Tiny
     ver.TextColor3          = Theme.Colors.TextMuted
