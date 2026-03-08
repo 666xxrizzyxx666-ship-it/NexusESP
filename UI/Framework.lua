@@ -1,261 +1,541 @@
 -- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — UI/Framework.lua
---   📁 Dossier : UI/
---   Rôle : Moteur principal de l'UI
---          Crée la fenêtre, sidebar, tabs, background animé
+--   Aurora v3.1.3 — UI/Framework.lua
+--   Style : Sidebar gauche + contenu droite
+--           Inspiré design moderne dark avec sous-tabs
 -- ══════════════════════════════════════════════════════
 
 local Framework = {}
 
-local TweenService   = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local RunService     = game:GetService("RunService")
-local Players        = game:GetService("Players")
-local LP             = Players.LocalPlayer
+local TweenS     = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UIS        = game:GetService("UserInputService")
+local Players    = game:GetService("Players")
+local LP         = Players.LocalPlayer
 
-local REPO = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
-
-local Theme     = nil
-local Animation = nil
-local Config    = nil
-
-local gui       = nil
-local window    = nil
-local sidebar   = nil
-local content   = nil
-local tabs      = {}
-local activeTab = nil
-local visible   = true
-
-local particles = {}
-local PARTICLE_COUNT = 40
+local Theme, Animation, Config
+local gui, window, sidebar, content
+local tabs       = {}
+local activeTab  = nil
+local visible    = true
+local particles  = {}
 
 -- ── Helpers ───────────────────────────────────────────
 local function C(r,g,b) return Color3.fromRGB(r,g,b) end
-
-local function makeCorner(parent, radius)
-    local c = Instance.new("UICorner", parent)
-    c.CornerRadius = radius or UDim.new(0,8)
+local function T(i, p, t, style)
+    return TweenS:Create(i,
+        TweenInfo.new(t or 0.25, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        p
+    )
+end
+local function corner(p, r)
+    local c = Instance.new("UICorner", p)
+    c.CornerRadius = r or UDim.new(0,8)
     return c
 end
-
-local function makeStroke(parent, color, thickness)
-    local s = Instance.new("UIStroke", parent)
-    s.Color     = color or C(30,30,50)
-    s.Thickness = thickness or 1
-    return s
+local function padding(p, all, t, b, l, r)
+    local pad = Instance.new("UIPadding", p)
+    pad.PaddingTop    = UDim.new(0, t or all or 6)
+    pad.PaddingBottom = UDim.new(0, b or all or 6)
+    pad.PaddingLeft   = UDim.new(0, l or all or 6)
+    pad.PaddingRight  = UDim.new(0, r or all or 6)
+    return pad
+end
+local function listLayout(p, dir, space)
+    local l = Instance.new("UIListLayout", p)
+    l.SortOrder       = Enum.SortOrder.LayoutOrder
+    l.FillDirection   = dir or Enum.FillDirection.Vertical
+    l.Padding         = UDim.new(0, space or 0)
+    return l
 end
 
-local function makePadding(parent, all, top, bottom, left, right)
-    local p = Instance.new("UIPadding", parent)
-    p.PaddingTop    = UDim.new(0, top    or all or 8)
-    p.PaddingBottom = UDim.new(0, bottom or all or 8)
-    p.PaddingLeft   = UDim.new(0, left   or all or 8)
-    p.PaddingRight  = UDim.new(0, right  or all or 8)
-    return p
-end
-
--- ── Protect GUI ───────────────────────────────────────
-local function protectGui(g)
-    local n = getgenv().NexusESP
-    if n and n.ProtectGui then n.ProtectGui(g) end
-end
-
--- ── Background animé (particules) ────────────────────
-local function createParticle(parent)
-    local p = Instance.new("Frame", parent)
-    p.BackgroundColor3    = Theme.Colors.Accent
-    p.BackgroundTransparency = 0.85
-    p.BorderSizePixel     = 0
-    local size = math.random(2, 5)
-    p.Size     = UDim2.fromOffset(size, size)
-    p.Position = UDim2.fromScale(math.random(), math.random())
-    makeCorner(p, UDim.new(1,0))
-    return {
-        frame   = p,
-        speedX  = (math.random() - 0.5) * 0.0003,
-        speedY  = (math.random() - 0.5) * 0.0003,
-        alpha   = math.random(75, 92) / 100,
-        pulse   = math.random() * math.pi * 2,
-    }
-end
-
-local function animateBackground(bgFrame)
-    for i = 1, PARTICLE_COUNT do
-        particles[i] = createParticle(bgFrame)
-    end
-
-    RunService.Heartbeat:Connect(function(dt)
-        if not bgFrame or not bgFrame.Parent then return end
-        local t = os.clock()
-        for _, p in ipairs(particles) do
-            if p.frame and p.frame.Parent then
-                local cx = p.frame.Position.X.Scale + p.speedX
-                local cy = p.frame.Position.Y.Scale + p.speedY
-                if cx < 0 then cx = 1 end
-                if cx > 1 then cx = 0 end
-                if cy < 0 then cy = 1 end
-                if cy > 1 then cy = 0 end
-                p.frame.Position = UDim2.fromScale(cx, cy)
-                p.pulse = p.pulse + dt * 0.8
-                local alpha = p.alpha + math.sin(p.pulse) * 0.06
-                p.frame.BackgroundTransparency = math.clamp(alpha, 0.7, 0.95)
-            end
-        end
-    end)
-end
-
--- ── Drag ──────────────────────────────────────────────
-local function makeDraggable(dragHandle, dragTarget)
-    local dragging = false
-    local dragStart, startPos
-
-    dragHandle.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
+-- ── Draggable ─────────────────────────────────────────
+local function makeDraggable(handle, target)
+    local dragging, dragStart, startPos = false, nil, nil
+    handle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging  = true
             dragStart = i.Position
-            startPos  = dragTarget.Position
+            startPos  = target.Position
         end
     end)
-
-    UserInputService.InputChanged:Connect(function(i)
-        if not dragging then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch then
-            local delta = i.Position - dragStart
-            dragTarget.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
+    UIS.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local d = i.Position - dragStart
+            target.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
             )
         end
     end)
-
-    UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
+    UIS.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
 end
 
--- ── Sidebar item ──────────────────────────────────────
-local function createSidebarItem(parent, icon, tabName, index)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size                = UDim2.new(1, 0, 0, 46)
-    btn.BackgroundColor3    = Theme.Colors.Surface
-    btn.BackgroundTransparency = 1
-    btn.BorderSizePixel     = 0
-    btn.Text                = ""
-    btn.LayoutOrder         = index
+-- ── Particle background ───────────────────────────────
+local function animateParticles(parent)
+    local count = 18
+    for i = 1, count do
+        local p = Instance.new("Frame", parent)
+        p.BackgroundColor3       = C(91,107,248)
+        p.BorderSizePixel        = 0
+        p.BackgroundTransparency = 0.82
+        local s = math.random(2,4)
+        p.Size     = UDim2.fromOffset(s,s)
+        p.Position = UDim2.fromScale(math.random()*0.95+0.02, math.random()*0.95+0.02)
+        corner(p, UDim.new(1,0))
+        table.insert(particles, p)
 
-    -- Indicateur actif (barre gauche)
-    local indicator = Instance.new("Frame", btn)
-    indicator.BackgroundColor3    = Theme.Colors.Accent
-    indicator.BorderSizePixel     = 0
-    indicator.Size                = UDim2.fromOffset(3, 24)
-    indicator.Position            = UDim2.new(0, 0, 0.5, -12)
-    indicator.BackgroundTransparency = 1
-    makeCorner(indicator, UDim.new(0,2))
-
-    -- Icône
-    local ico = Instance.new("TextLabel", btn)
-    ico.Text                = icon
-    ico.Font                = Enum.Font.GothamBold
-    ico.TextSize            = 11
-    ico.TextColor3          = Theme.Colors.TextSub
-    ico.BackgroundTransparency = 1
-    ico.BorderSizePixel     = 0
-    ico.Size                = UDim2.fromOffset(46, 46)
-    ico.TextXAlignment      = Enum.TextXAlignment.Center
-    ico.TextYAlignment      = Enum.TextYAlignment.Center
-
-    -- Tooltip (nom du tab au hover)
-    local tooltip = Instance.new("Frame", btn)
-    tooltip.BackgroundColor3    = Theme.Colors.SurfaceAlt
-    tooltip.BorderSizePixel     = 0
-    tooltip.Size                = UDim2.fromOffset(90, 28)
-    tooltip.Position            = UDim2.new(1, 6, 0.5, -14)
-    tooltip.BackgroundTransparency = 1
-    tooltip.ZIndex              = 100
-    makeCorner(tooltip, UDim.new(0,6))
-    makeStroke(tooltip, Theme.Colors.Border)
-
-    local ttLabel = Instance.new("TextLabel", tooltip)
-    ttLabel.Text                = tabName
-    ttLabel.Font                = Enum.Font.GothamMedium
-    ttLabel.TextSize            = 11
-    ttLabel.TextColor3          = Theme.Colors.Text
-    ttLabel.BackgroundTransparency = 1
-    ttLabel.Size                = UDim2.fromScale(1,1)
-    ttLabel.ZIndex              = 101
-
-    -- Hover effects
-    btn.MouseEnter:Connect(function()
-        Animation.Tween(ico,     {TextColor3 = Theme.Colors.Text},   TweenInfo.new(0.12))
-        Animation.Tween(tooltip, {BackgroundTransparency = 0},        TweenInfo.new(0.12))
-    end)
-    btn.MouseLeave:Connect(function()
-        if tabs[tabName] and tabs[tabName].active then return end
-        Animation.Tween(ico,     {TextColor3 = Theme.Colors.TextSub}, TweenInfo.new(0.12))
-        Animation.Tween(tooltip, {BackgroundTransparency = 1},         TweenInfo.new(0.12))
-    end)
-
-    return {
-        btn       = btn,
-        icon      = ico,
-        indicator = indicator,
-        tooltip   = tooltip,
-    }
+        task.spawn(function()
+            while p and p.Parent do
+                local ox = p.Position.X.Scale
+                local oy = p.Position.Y.Scale
+                local nx  = math.clamp(ox + (math.random()-0.5)*0.06, 0.02, 0.97)
+                local ny  = math.clamp(oy + (math.random()-0.5)*0.04, 0.02, 0.97)
+                local dur = 2 + math.random()*2
+                T(p, {Position=UDim2.fromScale(nx,ny), BackgroundTransparency=0.6+math.random()*0.3}, dur):Play()
+                task.wait(dur)
+            end
+        end)
+    end
 end
 
--- ── Activation d'un tab ───────────────────────────────
+-- ── Tab activation ────────────────────────────────────
 local function activateTab(name)
     if activeTab == name then return end
 
-    -- Désactive l'ancien
     if activeTab and tabs[activeTab] then
         local old = tabs[activeTab]
         old.active = false
-        if old.content then old.content.Visible = false end
-        Animation.Tween(old.sidebar.icon,      {TextColor3 = Theme.Colors.TextSub}, TweenInfo.new(0.15))
-        Animation.Tween(old.sidebar.indicator, {BackgroundTransparency = 1},         TweenInfo.new(0.15))
+        if old.content then
+            T(old.content, {BackgroundTransparency=1}, 0.2):Play()
+            task.delay(0.2, function()
+                if old.content then old.content.Visible = false end
+            end)
+        end
+        if old.sideBtn then
+            T(old.sideBtn, {BackgroundTransparency=1}, 0.2):Play()
+            T(old.sideIcon, {TextColor3=C(90,90,120)}, 0.2):Play()
+            T(old.sideLabel, {TextColor3=C(90,90,120)}, 0.2):Play()
+            if old.sideIndicator then
+                T(old.sideIndicator, {BackgroundTransparency=1}, 0.2):Play()
+            end
+        end
     end
 
     activeTab = name
     local t = tabs[name]
     if not t then return end
-
     t.active = true
+
     if t.content then
         t.content.Visible = true
-        Animation.SlideIn(t.content, "Right", 0.2)
+        t.content.BackgroundTransparency = 1
+        T(t.content, {BackgroundTransparency=0}, 0.22):Play()
     end
-    Animation.Tween(t.sidebar.icon,      {TextColor3 = Theme.Colors.Accent}, TweenInfo.new(0.15))
-    Animation.Tween(t.sidebar.indicator, {BackgroundTransparency = 0},        TweenInfo.new(0.15))
-end
-
--- ── Init principal ────────────────────────────────────
-function Framework.Init(deps)
-    Theme     = deps.Theme     or loadstring(game:HttpGet(REPO.."UI/Theme.lua",     true))()
-    Animation = deps.Animation or loadstring(game:HttpGet(REPO.."UI/Animation.lua", true))()
-    Config    = deps.Config
-
-    Animation.Init(Theme)
-
-    -- Applique accent color depuis config
-    if Config then
-        local uiCfg = Config:Get("UI")
-        if uiCfg and uiCfg.Accent then
-            Theme.Apply({Accent = uiCfg.Accent})
+    if t.sideBtn then
+        T(t.sideBtn, {BackgroundTransparency=0.88}, 0.2):Play()
+        T(t.sideIcon, {TextColor3=C(140,160,255)}, 0.2):Play()
+        T(t.sideLabel, {TextColor3=Color3.new(1,1,1)}, 0.2):Play()
+        if t.sideIndicator then
+            T(t.sideIndicator, {BackgroundTransparency=0}, 0.2):Play()
         end
     end
+end
+
+-- ── Build GUI ─────────────────────────────────────────
+function Framework._buildGui()
+    gui = Instance.new("ScreenGui")
+    gui.Name           = "Aurora_UI"
+    gui.ResetOnSpawn   = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    gui.DisplayOrder   = 100
+    pcall(function() gui.Parent = game:GetService("CoreGui") end)
+    if not gui.Parent then gui.Parent = LP:WaitForChild("PlayerGui") end
+
+    -- Fenêtre principale
+    window = Instance.new("Frame", gui)
+    window.Name              = "Window"
+    window.BackgroundColor3  = C(8,8,14)
+    window.BorderSizePixel   = 0
+    window.Size              = UDim2.fromOffset(680, 460)
+    window.Position          = UDim2.fromScale(0.5, 0.5)
+    window.AnchorPoint       = Vector2.new(0.5, 0.5)
+    window.ClipsDescendants  = true
+    corner(window, UDim.new(0,14))
+
+    -- Bordure accent
+    local winBorder = Instance.new("UIStroke", window)
+    winBorder.Color     = C(91,107,248)
+    winBorder.Thickness = 1
+    winBorder.Transparency = 0.5
+
+    -- Particles bg
+    animateParticles(window)
+
+    -- ── HEADER ────────────────────────────────────────
+    local header = Instance.new("Frame", window)
+    header.Name             = "Header"
+    header.BackgroundColor3 = C(10,10,18)
+    header.BorderSizePixel  = 0
+    header.Size             = UDim2.new(1,0,0,44)
+    header.ZIndex           = 10
+
+    -- Gradient header
+    local hGrad = Instance.new("UIGradient", header)
+    hGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, C(14,12,28)),
+        ColorSequenceKeypoint.new(1, C(10,10,18)),
+    })
+    hGrad.Rotation = 90
+
+    -- Ligne séparation header
+    local hLine = Instance.new("Frame", header)
+    hLine.BackgroundColor3 = C(91,107,248)
+    hLine.BackgroundTransparency = 0.7
+    hLine.BorderSizePixel  = 0
+    hLine.Size             = UDim2.new(1,0,0,1)
+    hLine.Position         = UDim2.new(0,0,1,-1)
+
+    -- Logo
+    local logoBox = Instance.new("Frame", header)
+    logoBox.BackgroundColor3 = C(91,107,248)
+    logoBox.BorderSizePixel  = 0
+    logoBox.Size             = UDim2.fromOffset(28,28)
+    logoBox.Position         = UDim2.new(0,10,0.5,-14)
+    corner(logoBox, UDim.new(0,7))
+
+    local logoTxt = Instance.new("TextLabel", logoBox)
+    logoTxt.Text            = "A"
+    logoTxt.Font            = Enum.Font.GothamBold
+    logoTxt.TextSize        = 14
+    logoTxt.TextColor3      = Color3.new(1,1,1)
+    logoTxt.BackgroundTransparency = 1
+    logoTxt.Size            = UDim2.fromScale(1,1)
+    logoTxt.TextXAlignment  = Enum.TextXAlignment.Center
+
+    local nameLabel = Instance.new("TextLabel", header)
+    nameLabel.Text           = "Aurora"
+    nameLabel.Font           = Enum.Font.GothamBold
+    nameLabel.TextSize       = 16
+    nameLabel.TextColor3     = Color3.new(1,1,1)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size           = UDim2.fromOffset(80,44)
+    nameLabel.Position       = UDim2.fromOffset(44,0)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local verLabel = Instance.new("TextLabel", header)
+    verLabel.Text           = "v3.1.3"
+    verLabel.Font           = Enum.Font.Gotham
+    verLabel.TextSize       = 11
+    verLabel.TextColor3     = C(91,107,248)
+    verLabel.BackgroundTransparency = 1
+    verLabel.Size           = UDim2.fromOffset(50,44)
+    verLabel.Position       = UDim2.fromOffset(122,0)
+    verLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Watermark droite
+    local wm = Instance.new("TextLabel", header)
+    wm.Name             = "WM"
+    wm.Text             = "-- | -- fps | --ms"
+    wm.Font             = Enum.Font.Gotham
+    wm.TextSize         = 12
+    wm.TextColor3       = C(130,130,180)
+    wm.BackgroundTransparency = 1
+    wm.Size             = UDim2.fromOffset(260,44)
+    wm.Position         = UDim2.new(1,-330,0,0)
+    wm.TextXAlignment   = Enum.TextXAlignment.Right
+
+    -- Boutons header
+    local function mkHBtn(txt, xOffset, hoverColor)
+        local b = Instance.new("TextButton", header)
+        b.Text            = txt
+        b.Font            = Enum.Font.GothamBold
+        b.TextSize        = 13
+        b.TextColor3      = C(150,150,180)
+        b.BackgroundColor3 = C(20,20,32)
+        b.BackgroundTransparency = 0.4
+        b.BorderSizePixel = 0
+        b.Size            = UDim2.fromOffset(28,28)
+        b.Position        = UDim2.new(1,xOffset,0.5,-14)
+        b.AutoButtonColor = false
+        corner(b, UDim.new(0,6))
+        b.MouseEnter:Connect(function()
+            T(b, {BackgroundColor3=hoverColor or C(40,40,60)}, 0.12):Play()
+            T(b, {TextColor3=Color3.new(1,1,1)}, 0.12):Play()
+        end)
+        b.MouseLeave:Connect(function()
+            T(b, {BackgroundColor3=C(20,20,32)}, 0.15):Play()
+            T(b, {TextColor3=C(150,150,180)}, 0.15):Play()
+        end)
+        return b
+    end
+
+    local closeBtn = mkHBtn("✕", -10, C(200,50,50))
+    local minBtn   = mkHBtn("─", -44, C(40,40,70))
+
+    closeBtn.MouseButton1Click:Connect(function() Framework.Hide() end)
+    minBtn.MouseButton1Click:Connect(function() Framework.Toggle() end)
+
+    makeDraggable(header, window)
+
+    -- ── SIDEBAR ───────────────────────────────────────
+    sidebar = Instance.new("Frame", window)
+    sidebar.Name            = "Sidebar"
+    sidebar.BackgroundColor3 = C(10,10,18)
+    sidebar.BorderSizePixel = 0
+    sidebar.Size            = UDim2.new(0,160,1,-44)
+    sidebar.Position        = UDim2.fromOffset(0,44)
+    sidebar.ClipsDescendants = true
+
+    -- Gradient sidebar
+    local sGrad = Instance.new("UIGradient", sidebar)
+    sGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, C(12,10,24)),
+        ColorSequenceKeypoint.new(1, C(10,10,18)),
+    })
+    sGrad.Rotation = 180
+
+    -- Séparateur droite
+    local sSep = Instance.new("Frame", sidebar)
+    sSep.BackgroundColor3 = C(91,107,248)
+    sSep.BackgroundTransparency = 0.8
+    sSep.BorderSizePixel  = 0
+    sSep.Size             = UDim2.fromOffset(1, 9999)
+    sSep.Position         = UDim2.new(1,-1,0,0)
+
+    local sLayout = Instance.new("ScrollingFrame", sidebar)
+    sLayout.BackgroundTransparency = 1
+    sLayout.BorderSizePixel        = 0
+    sLayout.Size                   = UDim2.fromScale(1,1)
+    sLayout.ScrollBarThickness     = 0
+    sLayout.CanvasSize             = UDim2.fromOffset(0,0)
+    sLayout.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+    listLayout(sLayout, nil, 2)
+    padding(sLayout, 8, 10, 8, 8, 8)
+
+    -- ── CONTENT ───────────────────────────────────────
+    content = Instance.new("Frame", window)
+    content.Name              = "Content"
+    content.BackgroundColor3  = C(8,8,14)
+    content.BackgroundTransparency = 0
+    content.BorderSizePixel   = 0
+    content.Size              = UDim2.new(1,-160,1,-44)
+    content.Position          = UDim2.fromOffset(160,44)
+    content.ClipsDescendants  = true
+
+    -- Watermark update loop
+    local fpsBuffer = {}
+    local lastT     = os.clock()
+    RunService.Heartbeat:Connect(function()
+        local now = os.clock()
+        table.insert(fpsBuffer, 1/(now-lastT))
+        lastT = now
+        if #fpsBuffer > 20 then table.remove(fpsBuffer,1) end
+        if #fpsBuffer % 10 == 0 then
+            local avg = 0
+            for _, v in ipairs(fpsBuffer) do avg = avg + v end
+            avg = math.floor(avg/#fpsBuffer)
+            local ping = 0
+            pcall(function() ping = math.floor(LP:GetNetworkPing()*1000) end)
+            local name = ""
+            pcall(function() name = LP.Name end)
+            local pingC = ping <= 80 and "✦" or ping <= 150 and "△" or "✕"
+            wm.Text = name.."  |  "..avg.." fps  |  "..pingC.." "..ping.."ms"
+            wm.TextColor3 = avg > 50 and C(130,130,180) or C(248,180,80)
+        end
+    end)
+
+    -- Keybind Insert pour toggle
+    UIS.InputBegan:Connect(function(inp, gp)
+        if gp then return end
+        if inp.KeyCode == Enum.KeyCode.Insert then
+            Framework.Toggle()
+        end
+    end)
+
+    Framework._gui     = gui
+    Framework._window  = window
+    Framework._sidebar = sLayout
+    Framework._content = content
+end
+
+-- ── AddTab ────────────────────────────────────────────
+function Framework.AddTab(name, icon)
+    if not Framework._sidebar then return end
+
+    -- Bouton sidebar
+    local btn = Instance.new("TextButton", Framework._sidebar)
+    btn.Name                 = "Tab_"..name
+    btn.BackgroundColor3     = C(91,107,248)
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel      = 0
+    btn.Size                 = UDim2.new(1,0,0,42)
+    btn.Text                 = ""
+    btn.AutoButtonColor      = false
+    btn.LayoutOrder          = #tabs + 1
+    corner(btn, UDim.new(0,8))
+
+    -- Indicateur actif gauche
+    local indicator = Instance.new("Frame", btn)
+    indicator.BackgroundColor3       = C(91,107,248)
+    indicator.BackgroundTransparency = 1
+    indicator.BorderSizePixel        = 0
+    indicator.Size                   = UDim2.fromOffset(3,24)
+    indicator.Position               = UDim2.new(0,0,0.5,-12)
+    corner(indicator, UDim.new(1,0))
+
+    -- Icône
+    local ico = Instance.new("TextLabel", btn)
+    ico.Text            = icon or "•"
+    ico.Font            = Enum.Font.GothamBold
+    ico.TextSize        = 11
+    ico.TextColor3      = C(90,90,120)
+    ico.BackgroundTransparency = 1
+    ico.Size            = UDim2.fromOffset(32,42)
+    ico.Position        = UDim2.fromOffset(10,0)
+    ico.TextXAlignment  = Enum.TextXAlignment.Center
+
+    -- Label
+    local lbl = Instance.new("TextLabel", btn)
+    lbl.Text            = name
+    lbl.Font            = Enum.Font.GothamMedium
+    lbl.TextSize        = 13
+    lbl.TextColor3      = C(90,90,120)
+    lbl.BackgroundTransparency = 1
+    lbl.Size            = UDim2.new(1,-44,1,0)
+    lbl.Position        = UDim2.fromOffset(40,0)
+    lbl.TextXAlignment  = Enum.TextXAlignment.Left
+
+    -- Hover
+    btn.MouseEnter:Connect(function()
+        if not (tabs[name] and tabs[name].active) then
+            T(btn, {BackgroundTransparency=0.92}, 0.12):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if not (tabs[name] and tabs[name].active) then
+            T(btn, {BackgroundTransparency=1}, 0.15):Play()
+        end
+    end)
+    btn.MouseButton1Click:Connect(function()
+        activateTab(name)
+    end)
+
+    -- Zone de contenu
+    local tabContent = Instance.new("Frame", Framework._content)
+    tabContent.Name                  = "Tab_"..name
+    tabContent.BackgroundTransparency = 1
+    tabContent.BorderSizePixel       = 0
+    tabContent.Size                  = UDim2.fromScale(1,1)
+    tabContent.Visible               = false
+
+    local scroll = Instance.new("ScrollingFrame", tabContent)
+    scroll.Name                  = "Scroll"
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel       = 0
+    scroll.Size                  = UDim2.fromScale(1,1)
+    scroll.ScrollBarThickness    = 3
+    scroll.ScrollBarImageColor3  = C(91,107,248)
+    scroll.CanvasSize            = UDim2.fromOffset(0,0)
+    scroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+    listLayout(scroll, nil, 10)
+    padding(scroll, 14)
+
+    tabs[name] = {
+        name         = name,
+        content      = tabContent,
+        scroll       = scroll,
+        sideBtn      = btn,
+        sideIcon     = ico,
+        sideLabel    = lbl,
+        sideIndicator = indicator,
+        active       = false,
+    }
+
+    if not activeTab then
+        activateTab(name)
+    end
+
+    return tabs[name]
+end
+
+-- ── AddSection ────────────────────────────────────────
+function Framework.AddSection(tabName, title)
+    local t = tabs[tabName]
+    if not t then return nil end
+
+    local section = Instance.new("Frame", t.scroll)
+    section.Name             = "Sec_"..title
+    section.BackgroundColor3 = C(13,13,22)
+    section.BorderSizePixel  = 0
+    section.Size             = UDim2.new(1,0,0,0)
+    section.AutomaticSize    = Enum.AutomaticSize.Y
+    corner(section, UDim.new(0,10))
+
+    local stroke = Instance.new("UIStroke", section)
+    stroke.Color       = C(30,30,55)
+    stroke.Thickness   = 1
+
+    -- Header section
+    local secHeader = Instance.new("Frame", section)
+    secHeader.BackgroundTransparency = 1
+    secHeader.BorderSizePixel        = 0
+    secHeader.Size                   = UDim2.new(1,0,0,36)
+
+    local secLine = Instance.new("Frame", secHeader)
+    secLine.BackgroundColor3 = C(91,107,248)
+    secLine.BackgroundTransparency = 0.6
+    secLine.BorderSizePixel  = 0
+    secLine.Size             = UDim2.fromOffset(3,16)
+    secLine.Position         = UDim2.new(0,12,0.5,-8)
+    corner(secLine, UDim.new(1,0))
+
+    local titleLbl = Instance.new("TextLabel", secHeader)
+    titleLbl.Text           = title:upper()
+    titleLbl.Font           = Enum.Font.GothamBold
+    titleLbl.TextSize       = 10
+    titleLbl.TextColor3     = C(91,107,248)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Size           = UDim2.new(1,-20,1,0)
+    titleLbl.Position       = UDim2.fromOffset(22,0)
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.TextTransparency = 0.1
+
+    local divider = Instance.new("Frame", section)
+    divider.BackgroundColor3 = C(20,20,38)
+    divider.BorderSizePixel  = 0
+    divider.Size             = UDim2.new(1,-24,0,1)
+    divider.Position         = UDim2.fromOffset(12,36)
+
+    local items = Instance.new("Frame", section)
+    items.Name             = "Items"
+    items.BackgroundTransparency = 1
+    items.BorderSizePixel  = 0
+    items.Size             = UDim2.new(1,0,0,0)
+    items.AutomaticSize    = Enum.AutomaticSize.Y
+    items.Position         = UDim2.fromOffset(0,40)
+    listLayout(items, nil, 0)
+    padding(items, 0, 2, 8, 8, 8)
+
+    local itemLayout = Instance.new("UIListLayout", items)
+    itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    itemLayout.Padding   = UDim.new(0,2)
+
+    return {frame=section, container=items, layout=itemLayout}
+end
+
+-- ── Init ──────────────────────────────────────────────
+function Framework.Init(deps)
+    Theme     = deps.Theme     or {}
+    Animation = deps.Animation or {}
+    Config    = deps.Config
 
     Framework._buildGui()
 
-    -- ── Tabs par défaut ───────────────────────────────
     local defaultTabs = {
         {"ESP",      "ESP"},
         {"Combat",   "CMB"},
@@ -266,347 +546,33 @@ function Framework.Init(deps)
         {"Utility",  "UTL"},
         {"Config",   "CFG"},
     }
-    for _, t in ipairs(defaultTabs) do
-        Framework.AddTab(t[1], t[2])
+    for _, tab in ipairs(defaultTabs) do
+        Framework.AddTab(tab[1], tab[2])
     end
-end
-
-function Framework._buildGui()
-    -- ScreenGui
-    gui = Instance.new("ScreenGui")
-    gui.Name              = "NexusESP_UI"
-    gui.ResetOnSpawn      = false
-    gui.IgnoreGuiInset    = true
-    gui.ZIndexBehavior    = Enum.ZIndexBehavior.Global
-    gui.DisplayOrder      = 999
-    protectGui(gui)
-    pcall(function() gui.Parent = game:GetService("CoreGui") end)
-    if not gui.Parent then gui.Parent = LP:WaitForChild("PlayerGui") end
-
-    -- Background overlay animé
-    local bgFrame = Instance.new("Frame", gui)
-    bgFrame.Name                  = "Background"
-    bgFrame.BackgroundColor3      = Theme.Colors.Background
-    bgFrame.BorderSizePixel       = 0
-    bgFrame.Size                  = UDim2.fromOffset(
-        Theme.Size.WindowWidth,
-        Theme.Size.WindowHeight
-    )
-    bgFrame.Position              = UDim2.fromScale(0.5, 0.5)
-    bgFrame.AnchorPoint           = Vector2.new(0.5, 0.5)
-    bgFrame.ClipsDescendants      = true
-    makeCorner(bgFrame, Theme.Radius.Window)
-    makeStroke(bgFrame, Theme.Colors.Border, 1)
-    animateBackground(bgFrame)
-
-    window = bgFrame
-
-    -- ── Header ────────────────────────────────────────
-    local header = Instance.new("Frame", window)
-    header.Name                = "Header"
-    header.BackgroundColor3    = Theme.Colors.Surface
-    header.BorderSizePixel     = 0
-    header.Size                = UDim2.new(1, 0, 0, Theme.Size.HeaderHeight)
-    makeCorner(header, UDim.new(0,12))
-
-    -- Fix coins bas du header
-    local headerFix = Instance.new("Frame", header)
-    headerFix.BackgroundColor3    = Theme.Colors.Surface
-    headerFix.BorderSizePixel     = 0
-    headerFix.Size                = UDim2.new(1,0,0,12)
-    headerFix.Position            = UDim2.new(0,0,1,-12)
-
-    -- Barre accent gauche
-    local acBar = Instance.new("Frame", header)
-    acBar.BackgroundColor3 = Theme.Colors.Accent
-    acBar.BorderSizePixel  = 0
-    acBar.Size             = UDim2.fromOffset(3, 30)
-    acBar.Position         = UDim2.new(0, 0, 0.5, -15)
-    makeCorner(acBar, UDim.new(0,2))
-
-    -- Logo
-    local logo = Instance.new("TextLabel", header)
-    logo.Text               = "✦  Aurora"
-    logo.Font               = Theme.Fonts.Bold
-    logo.TextSize           = Theme.TextSize.Logo
-    logo.TextColor3         = Theme.Colors.Accent
-    logo.BackgroundTransparency = 1
-    logo.Size               = UDim2.new(0, 160, 1, 0)
-    logo.Position           = UDim2.fromOffset(16, 0)
-    logo.TextXAlignment     = Enum.TextXAlignment.Left
-
-    -- Version
-    local ver = Instance.new("TextLabel", header)
-    ver.Text = "v3.1.1"
-    ver.Font                = Theme.Fonts.Regular
-    ver.TextSize            = Theme.TextSize.Tiny
-    ver.TextColor3          = Theme.Colors.TextMuted
-    ver.BackgroundTransparency = 1
-    ver.Size                = UDim2.new(0, 60, 1, 0)
-    ver.Position            = UDim2.fromOffset(145, 0)
-    ver.TextXAlignment      = Enum.TextXAlignment.Left
-
-    -- Watermark droite (FPS/Ping)
-    local wm = Instance.new("TextLabel", header)
-    wm.Name                 = "Watermark"
-    wm.Text                 = "FPS: -- | Ping: --ms"
-    wm.Font                 = Theme.Fonts.Regular
-    wm.TextSize             = Theme.TextSize.Small
-    wm.TextColor3           = Theme.Colors.TextSub
-    wm.BackgroundTransparency = 1
-    wm.Size                 = UDim2.new(0, 200, 1, 0)
-    wm.Position             = UDim2.new(1, -280, 0, 0)
-    wm.TextXAlignment       = Enum.TextXAlignment.Right
-
-    -- Bouton minimiser
-    local minBtn = Instance.new("TextButton", header)
-    minBtn.Text                = "─"
-    minBtn.Font                = Theme.Fonts.Bold
-    minBtn.TextSize            = 14
-    minBtn.TextColor3          = Theme.Colors.TextSub
-    minBtn.BackgroundColor3    = Theme.Colors.SurfaceAlt
-    minBtn.BorderSizePixel     = 0
-    minBtn.Size                = UDim2.fromOffset(28, 28)
-    minBtn.Position            = UDim2.new(1, -64, 0.5, -14)
-    makeCorner(minBtn, UDim.new(0,6))
-
-    -- Bouton fermer
-    local closeBtn = Instance.new("TextButton", closeBtn or header)
-    closeBtn = Instance.new("TextButton", header)
-    closeBtn.Text               = "✕"
-    closeBtn.Font               = Theme.Fonts.Bold
-    closeBtn.TextSize           = 12
-    closeBtn.TextColor3         = Theme.Colors.TextSub
-    closeBtn.BackgroundColor3   = Theme.Colors.SurfaceAlt
-    closeBtn.BorderSizePixel    = 0
-    closeBtn.Size               = UDim2.fromOffset(28, 28)
-    closeBtn.Position           = UDim2.new(1, -32, 0.5, -14)
-    makeCorner(closeBtn, UDim.new(0,6))
-
-    closeBtn.MouseButton1Click:Connect(function()
-        Framework.Hide()
-    end)
-    minBtn.MouseButton1Click:Connect(function()
-        Framework.Toggle()
-    end)
-
-    -- Hover sur boutons header
-    for _, b in ipairs({minBtn, closeBtn}) do
-        b.MouseEnter:Connect(function()
-            Animation.Tween(b, {BackgroundColor3 = Theme.Colors.BorderHover}, TweenInfo.new(0.1))
-        end)
-        b.MouseLeave:Connect(function()
-            Animation.Tween(b, {BackgroundColor3 = Theme.Colors.SurfaceAlt},  TweenInfo.new(0.1))
-        end)
-    end
-
-    makeDraggable(header, window)
-
-    -- ── Sidebar ───────────────────────────────────────
-    sidebar = Instance.new("Frame", window)
-    sidebar.Name               = "Sidebar"
-    sidebar.BackgroundColor3   = Theme.Colors.Surface
-    sidebar.BorderSizePixel    = 0
-    sidebar.Size               = UDim2.new(0, Theme.Size.SidebarWidth, 1, -Theme.Size.HeaderHeight)
-    sidebar.Position           = UDim2.new(0, 0, 0, Theme.Size.HeaderHeight)
-
-    -- Séparateur droite sidebar
-    local sep = Instance.new("Frame", sidebar)
-    sep.BackgroundColor3 = Theme.Colors.Border
-    sep.BorderSizePixel  = 0
-    sep.Size             = UDim2.fromOffset(1, 9999)
-    sep.Position         = UDim2.new(1, -1, 0, 0)
-
-    local sideLayout = Instance.new("UIListLayout", sidebar)
-    sideLayout.SortOrder        = Enum.SortOrder.LayoutOrder
-    sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sideLayout.Padding          = UDim.new(0, 2)
-    makePadding(sidebar, 6)
-
-    -- ── Content area ──────────────────────────────────
-    content = Instance.new("Frame", window)
-    content.Name               = "Content"
-    content.BackgroundTransparency = 1
-    content.BorderSizePixel    = 0
-    content.Size               = UDim2.new(1, -Theme.Size.SidebarWidth, 1, -Theme.Size.HeaderHeight)
-    content.Position           = UDim2.new(0, Theme.Size.SidebarWidth, 0, Theme.Size.HeaderHeight)
-    content.ClipsDescendants   = true
-
-    -- Watermark update
-    Framework._startWatermark(wm)
 
     -- Animation d'entrée
     window.Size = UDim2.fromOffset(0, 0)
     window.BackgroundTransparency = 1
-    TweenService:Create(window, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.fromOffset(Theme.Size.WindowWidth, Theme.Size.WindowHeight),
-        BackgroundTransparency = 0,
-    }):Play()
-
-    Framework._gui       = gui
-    Framework._window    = window
-    Framework._sidebar   = sidebar
-    Framework._content   = content
-    Framework._header    = header
+    local tween = TweenS:Create(window,
+        TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.fromOffset(680,460), BackgroundTransparency=0}
+    )
+    tween:Play()
 end
 
--- ── Watermark ─────────────────────────────────────────
-function Framework._startWatermark(label)
-    local fpsBuffer = {}
-    local lastTime  = os.clock()
-
-    RunService.Heartbeat:Connect(function()
-        local now = os.clock()
-        local dt  = now - lastTime
-        lastTime  = now
-        table.insert(fpsBuffer, 1/dt)
-        if #fpsBuffer > 30 then table.remove(fpsBuffer, 1) end
-        local avgFps = 0
-        for _, v in ipairs(fpsBuffer) do avgFps = avgFps + v end
-        avgFps = math.floor(avgFps / #fpsBuffer)
-
-        local ping = 0
-        pcall(function()
-            ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000)
-        end)
-
-        local username = ""
-        pcall(function() username = Players.LocalPlayer.Name end)
-        local pingColor = ping <= 80 and Theme.Colors.Success or ping <= 150 and Theme.Colors.Warning or Theme.Colors.Danger
-        label.Text = username.." | "..avgFps.." fps | "..ping.."ms"
-        label.TextColor3 = avgFps > 50
-            and Theme.Colors.TextSub
-            or  Theme.Colors.Warning
-    end)
-end
-
--- ── Ajouter un tab ────────────────────────────────────
-function Framework.AddTab(name, icon)
-    local sidebarItem = createSidebarItem(sidebar, icon, name, #tabs + 1)
-
-    local tabContent = Instance.new("Frame", content)
-    tabContent.Name                  = "Tab_"..name
-    tabContent.BackgroundTransparency = 1
-    tabContent.BorderSizePixel       = 0
-    tabContent.Size                  = UDim2.fromScale(1,1)
-    tabContent.Visible               = false
-    tabContent.ClipsDescendants      = true
-
-    -- Scroll
-    local scroll = Instance.new("ScrollingFrame", tabContent)
-    scroll.Name                     = "Scroll"
-    scroll.BackgroundTransparency   = 1
-    scroll.BorderSizePixel          = 0
-    scroll.Size                     = UDim2.fromScale(1,1)
-    scroll.ScrollBarThickness       = 3
-    scroll.ScrollBarImageColor3     = Theme.Colors.Accent
-    scroll.CanvasSize               = UDim2.fromOffset(0,0)
-    scroll.AutomaticCanvasSize      = Enum.AutomaticSize.Y
-
-    local layout = Instance.new("UIListLayout", scroll)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding   = UDim.new(0, 8)
-    makePadding(scroll, 10)
-
-    tabs[name] = {
-        name    = name,
-        icon    = icon,
-        content = tabContent,
-        scroll  = scroll,
-        layout  = layout,
-        sidebar = sidebarItem,
-        active  = false,
-    }
-
-    sidebarItem.btn.MouseButton1Click:Connect(function()
-        activateTab(name)
-    end)
-
-    -- Active le premier tab automatiquement
-    if not activeTab then
-        activateTab(name)
-    end
-
-    return tabs[name]
-end
-
--- ── Ajouter une section dans un tab ───────────────────
-function Framework.AddSection(tabName, title)
-    local t = tabs[tabName]
-    if not t then return end
-
-    local section = Instance.new("Frame", t.scroll)
-    section.Name               = "Section_"..title
-    section.BackgroundColor3   = Theme.Colors.Surface
-    section.BorderSizePixel    = 0
-    section.Size               = UDim2.new(1, 0, 0, 0)
-    section.AutomaticSize      = Enum.AutomaticSize.Y
-    makeCorner(section, Theme.Radius.Card)
-    makeStroke(section, Theme.Colors.Border)
-
-    -- Titre section
-    local titleBar = Instance.new("Frame", section)
-    titleBar.BackgroundTransparency = 1
-    titleBar.BorderSizePixel        = 0
-    titleBar.Size                   = UDim2.new(1,0,0,32)
-
-    local titleLabel = Instance.new("TextLabel", titleBar)
-    titleLabel.Text              = title:upper()
-    titleLabel.Font              = Theme.Fonts.Bold
-    titleLabel.TextSize          = Theme.TextSize.Small
-    titleLabel.TextColor3        = Theme.Colors.Accent
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Size              = UDim2.fromScale(1,1)
-    titleLabel.TextXAlignment    = Enum.TextXAlignment.Left
-    makePadding(titleLabel, 0, 0, 0, 12, 0)
-
-    -- Séparateur
-    local sep = Instance.new("Frame", section)
-    sep.BackgroundColor3 = Theme.Colors.Border
-    sep.BorderSizePixel  = 0
-    sep.Size             = UDim2.new(1,-24,0,1)
-    sep.Position         = UDim2.fromOffset(12, 30)
-
-    -- Container des items
-    local itemContainer = Instance.new("Frame", section)
-    itemContainer.Name             = "Items"
-    itemContainer.BackgroundTransparency = 1
-    itemContainer.BorderSizePixel  = 0
-    itemContainer.Size             = UDim2.new(1,0,0,0)
-    itemContainer.Position         = UDim2.fromOffset(0, 34)
-    itemContainer.AutomaticSize   = Enum.AutomaticSize.Y
-
-    local itemLayout = Instance.new("UIListLayout", itemContainer)
-    itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    itemLayout.Padding   = UDim.new(0, 2)
-    makePadding(itemContainer, 0, 4, 8, 8, 8)
-
-    return {
-        frame     = section,
-        container = itemContainer,
-        layout    = itemLayout,
-    }
-end
-
--- ── Visibilité ────────────────────────────────────────
+-- ── Visibility ────────────────────────────────────────
 function Framework.Show()
     if not window then return end
     visible = true
     window.Visible = true
-    Animation.Tween(window,
-        {BackgroundTransparency = 0},
-        TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    )
+    T(window, {BackgroundTransparency=0, Size=UDim2.fromOffset(680,460)}, 0.3, Enum.EasingStyle.Back):Play()
 end
 
 function Framework.Hide()
     if not window then return end
     visible = false
-    Animation.Tween(window,
-        {BackgroundTransparency = 1},
-        TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-    )
-    task.delay(0.15, function()
+    T(window, {BackgroundTransparency=1, Size=UDim2.fromOffset(660,440)}, 0.2):Play()
+    task.delay(0.22, function()
         if window then window.Visible = false end
     end)
 end
@@ -615,15 +581,13 @@ function Framework.Toggle()
     if visible then Framework.Hide() else Framework.Show() end
 end
 
-function Framework.IsVisible()
-    return visible
+function Framework.IsVisible() return visible end
+
+function Framework.HideAll()
+    if gui then gui.Enabled = false end
 end
 
-function Framework.Destroy()
-    if gui then gui:Destroy(); gui = nil end
-    tabs      = {}
-    activeTab = nil
-    particles = {}
-end
+function Framework.GetGui()   return gui    end
+function Framework.GetWindow() return window end
 
 return Framework
