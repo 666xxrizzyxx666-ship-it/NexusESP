@@ -5,7 +5,7 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.1.2"
+local VERSION = "3.1.3"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
@@ -76,12 +76,13 @@ print("[Aurora] UI...")
 N.Theme         = load("UI/Theme.lua")
 N.Animation     = load("UI/Animation.lua")
 N.Notifications = load("UI/Notifications.lua")
-N.Watermark     = load("UI/Watermark.lua")
+-- Watermark standalone désactivé — intégré dans le header du Framework
+-- N.Watermark = load("UI/Watermark.lua")
 N.Framework     = load("UI/Framework.lua")
 
 if N.Animation     then N.Animation.Init(N.Theme) end
 if N.Notifications then N.Notifications.Init(N.Theme, N.Animation) end
-if N.Watermark     then N.Watermark.Init(N.Theme, N.Animation) end
+-- if N.Watermark     then N.Watermark.Init(N.Theme, N.Animation) end
 
 local Toggle      = load("UI/Components/Toggle.lua")
 local Slider      = load("UI/Components/Slider.lua")
@@ -273,16 +274,24 @@ if F and C then
     local espSec = F.AddSection("ESP", "Joueurs")
     if espSec and C.Toggle then
         C.Toggle.new(espSec.container, {
+            label   = "ESP (Global)",
+            default = false,
+            onChange = function(v)
+                if N.ESP then
+                    if v then N.ESP.Enable() else N.ESP.Disable() end
+                end
+            end,
+        })
+        C.Toggle.new(espSec.container, {
             label   = "Box ESP",
             default = false,
             onChange = function(v)
-                if Cfg then Cfg:Set("Box", {Enabled=v}) end
                 if N.ESP then N.ESP.SetOption("Box", v) end
             end,
         })
         C.Toggle.new(espSec.container, {
             label   = "Skeleton",
-            default = true,
+            default = false,
             onChange = function(v) if N.ESP then N.ESP.SetOption("Skeleton", v) end end,
         })
         C.Toggle.new(espSec.container, {
