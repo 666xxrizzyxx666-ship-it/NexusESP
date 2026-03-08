@@ -277,4 +277,16 @@ function ESP.TogglePlayer(player)
     playerData[player].enabled = not playerData[player].enabled
 end
 
+-- SetOption — modifie une option à la volée
+function ESP.SetOption(key, value)
+    if Config and Config.Current then
+        local current = Config.Current[key]
+        if type(current) == "table" then
+            current.Enabled = value
+        else
+            Config.Current[key] = value
+        end
+    end
+end
+
 return ESP
