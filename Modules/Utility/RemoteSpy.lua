@@ -1,20 +1,16 @@
 -- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Modules/Utility/RemoteSpy.lua
---   📁 Dossier : Modules/Utility/
---   Rôle : Intercepte tous les RemoteEvents
---          Log en temps réel
+--   Aurora v3.1.3 — Modules/Utility/RemoteSpy.lua
+--   Rôle : Intercepte les RemoteEvents (optionnel)
 -- ══════════════════════════════════════════════════════
 
 local RemoteSpy = {}
 
-local MAX_LOG    = 200
-local log        = {}
-local enabled    = false
-local callbacks  = {}
-local blacklist  = {
-    "Heartbeat", "Update", "Tick", "Ping", "KeepAlive",
-    "PlayerInput", "CameraChanged", "CharacterMoved",
-}
+local MAX_LOG   = 200
+local log       = {}
+local enabled   = false
+local callbacks = {}
+local blacklist = {"Heartbeat","Update","Tick","Ping","KeepAlive","PlayerInput","CameraChanged","CharacterMoved"}
+local original  = nil
 
 local function isBlacklisted(name)
     for _, bl in ipairs(blacklist) do
@@ -23,26 +19,20 @@ local function isBlacklisted(name)
     return false
 end
 
-local function addLog(entry)
-    table.insert(log, 1, entry)
-    if #log > MAX_LOG then
-        table.remove(log, #log)
-    end
-    for _, cb in ipairs(callbacks) do
-        pcall(cb, entry)
-    end
+local function serialize(v)
+    local t = typeof(v)
+    if t == "string"   then return '"'..tostring(v)..'"'
+    elseif t == "number"  then return tostring(v)
+    elseif t == "boolean" then return tostring(v)
+    elseif t == "Vector3" then return "V3("..math.floor(v.X)..","..math.floor(v.Y)..","..math.floor(v.Z)..")"
+    elseif t == "Instance" then return t..":"..v.Name
+    else return t end
 end
 
 local function serializeArgs(args)
     local parts = {}
-    for i, v in ipairs(args) do
-        local t = typeof(v)
-        if t == "string"  then table.insert(parts, '"'..tostring(v)..'"')
-        elseif t == "number"  then table.insert(parts, tostring(v))
-        elseif t == "boolean" then table.insert(parts, tostring(v))
-        elseif t == "Vector3" then table.insert(parts, "V3("..math.floor(v.X)..","..math.floor(v.Y)..","..math.floor(v.Z)..")")
-        elseif t == "Instance" then table.insert(parts, t..":"..v.Name)
-        else table.insert(parts, t) end
+    for _, v in ipairs(args) do
+        table.insert(parts, serialize(v))
     end
     return table.concat(parts, ", ")
 end
@@ -53,75 +43,64 @@ end
 
 function RemoteSpy.Enable()
     if enabled then return end
+    -- Vérifie que les fonctions nécessaires existent
+    if not getrawmetatable or not setreadonly or not newcclosure or not getnamecallmethod then
+        warn("[RemoteSpy] Exécuteur incompatible — désactivé")
+        return
+    end
     enabled = true
-
     pcall(function()
         local mt  = getrawmetatable(game)
-        local old = mt.__namecall
+        original  = mt.__namecall
         setreadonly(mt, false)
-
         mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             local args   = {...}
-
-            if enabled then
-                if (method == "FireServer" or method == "InvokeServer") then
-                    if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
-                        if not isBlacklisted(self.Name) then
-                            local entry = {
-                                name   = self.Name,
-                                method = method,
-                                path   = self:GetFullName(),
-                                args   = serializeArgs(args),
-                                time   = os.clock(),
-                            }
-                            addLog(entry)
-                        end
+            if enabled and (method == "FireServer" or method == "InvokeServer") then
+                if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
+                    if not isBlacklisted(self.Name) then
+                        local entry = {
+                            name   = self.Name,
+                            method = method,
+                            path   = self:GetFullName(),
+                            args   = serializeArgs(args),
+                            time   = os.clock(),
+                        }
+                        table.insert(log, 1, entry)
+                        if #log > MAX_LOG then table.remove(log) end
+                        for _, cb in ipairs(callbacks) do pcall(cb, entry) end
                     end
                 end
             end
-
-            return old(self, ...)
+            return original(self, ...)
         end)
-
         setreadonly(mt, true)
     end)
-
     print("[RemoteSpy] Activé ✓")
 end
 
 function RemoteSpy.Disable()
+    if not enabled then return end
     enabled = false
+    pcall(function()
+        if original then
+            local mt = getrawmetatable(game)
+            setreadonly(mt, false)
+            mt.__namecall = original
+            setreadonly(mt, true)
+            original = nil
+        end
+    end)
     print("[RemoteSpy] Désactivé")
 end
 
-function RemoteSpy.GetLog()
-    return log
+function RemoteSpy.Toggle()
+    if enabled then RemoteSpy.Disable() else RemoteSpy.Enable() end
 end
 
-function RemoteSpy.ClearLog()
-    log = {}
-end
-
-function RemoteSpy.OnLog(cb)
-    table.insert(callbacks, cb)
-end
-
-function RemoteSpy.AddBlacklist(name)
-    table.insert(blacklist, name)
-end
-
-function RemoteSpy.FireRemote(path, ...)
-    local ok, remote = pcall(function()
-        return game:FindFirstChild(path, true)
-    end)
-    if ok and remote then
-        pcall(function() remote:FireServer(...) end)
-        return true
-    end
-    return false
-end
-
+function RemoteSpy.OnLog(cb) table.insert(callbacks, cb) end
+function RemoteSpy.GetLog()  return log end
+function RemoteSpy.Clear()   log = {} end
 function RemoteSpy.IsEnabled() return enabled end
 
 return RemoteSpy
