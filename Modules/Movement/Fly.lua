@@ -18,6 +18,7 @@ local conn     = nil
 local bv       = nil
 local bg       = nil
 
+local speed_override = nil
 local keys = {
     up   = false,
     down = false,
@@ -53,7 +54,7 @@ function Fly.Init(deps)
         end
     end)
 
-    print("[Fly] Initialisé ✓")
+    task.defer(function()end)
 end
 
 function Fly._start()
@@ -77,7 +78,7 @@ function Fly._start()
 
     conn = RunService.Heartbeat:Connect(function()
         local cfg = Config and Config.Current and Config.Current.Fly
-        local speed = cfg and cfg.Speed or 50
+        local speed = speed_override or (cfg and cfg.Speed) or 50
         local r = getRoot()
         if not r then return end
 
@@ -117,14 +118,14 @@ function Fly.Enable()
     if enabled then return end
     enabled = true
     Fly._start()
-    print("[Fly] Activé ✓")
+    task.defer(function()end)
 end
 
 function Fly.Disable()
     if not enabled then return end
     enabled = false
     Fly._stop()
-    print("[Fly] Désactivé")
+    task.defer(function()end)
 end
 
 function Fly.Toggle()
@@ -134,3 +135,9 @@ end
 function Fly.IsEnabled() return enabled end
 
 return Fly
+
+-- SetSpeed alias
+function Fly.SetSpeed(v)
+    if Config then Config:Set("Fly", {Speed=v}) end
+    speed_override = v
+end
