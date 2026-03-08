@@ -470,7 +470,10 @@ function Framework._startWatermark(label)
             ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000)
         end)
 
-        label.Text = "FPS: "..avgFps.." | Ping: "..ping.."ms"
+        local username = ""
+        pcall(function() username = Players.LocalPlayer.Name end)
+        local pingColor = ping <= 80 and Theme.Colors.Success or ping <= 150 and Theme.Colors.Warning or Theme.Colors.Danger
+        label.Text = username.." | "..avgFps.." fps | "..ping.."ms"
         label.TextColor3 = avgFps > 50
             and Theme.Colors.TextSub
             or  Theme.Colors.Warning
