@@ -28,7 +28,7 @@ function Toggle.new(parent, opts)
     local self = setmetatable({}, Toggle)
 
     self.value    = opts.default or false
-    self.callback = opts.callback or function() end
+    self.callback = opts.onChange or opts.callback or function() end
     self.label    = opts.label   or "Toggle"
     self.desc     = opts.desc    or nil
     self.disabled = opts.disabled or false
