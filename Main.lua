@@ -5,11 +5,11 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.0.4"
+local VERSION = "3.0.5"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
-print("║  NexusESP v"..VERSION.."           ║")
+print("║  Aurora v"..VERSION.."           ║")
 print("║  Loading...                  ║")
 print("╚══════════════════════════════╝")
 
@@ -18,7 +18,7 @@ local function load(path)
         return loadstring(game:HttpGet(REPO..path, true))()
     end)
     if not ok then
-        warn("[NexusESP] Erreur : "..path.." → "..tostring(result))
+        warn("[Aurora] Erreur : "..path.." → "..tostring(result))
         return nil
     end
     return result
@@ -28,7 +28,7 @@ getgenv().NexusESP = {}
 local N = getgenv().NexusESP
 
 -- ── Phase 1 : Core ────────────────────────────────────
-print("[NexusESP] Core...")
+print("[Aurora] Core...")
 N.Signal   = load("Core/Signal.lua")
 N.EventBus = load("Core/EventBus.lua")
 N.Thread   = load("Core/Thread.lua")
@@ -36,7 +36,7 @@ N.Memory   = load("Core/Memory.lua")
 if N.EventBus then N.EventBus.Init() end
 
 -- ── Phase 2 : Config ──────────────────────────────────
-print("[NexusESP] Config...")
+print("[Aurora] Config...")
 N.Profiles = load("Config/Profiles.lua")
 N.Config   = load("Config/Manager.lua")
 if N.Profiles then N.Profiles.Init() end
@@ -47,13 +47,13 @@ if N.Config   then
 end
 
 -- ── Phase 3 : Network / Key ───────────────────────────
-print("[NexusESP] Network/Key...")
+print("[Aurora] Network/Key...")
 N.Firebase  = load("Network/Firebase.lua")
 N.Updater   = load("Network/Updater.lua")
 N.KeySystem = load("Security/KeySystem.lua")
 if N.KeySystem then
     local valid = N.KeySystem.Validate()
-    if not valid then warn("[NexusESP] Clé invalide — arrêt"); return end
+    if not valid then warn("[Aurora] Clé invalide — arrêt"); return end
 end
 N.Detector     = load("Security/Detector.lua")
 N.GenericBypass = load("Security/GenericBypass.lua")
@@ -64,7 +64,7 @@ if N.GenericBypass then N.GenericBypass.Init() end
 N.Utils = load("Modules/Utils.lua")
 
 -- ── Phase 5 : UI ──────────────────────────────────────
-print("[NexusESP] UI...")
+print("[Aurora] UI...")
 N.Theme         = load("UI/Theme.lua")
 N.Animation     = load("UI/Animation.lua")
 N.Notifications = load("UI/Notifications.lua")
@@ -105,7 +105,7 @@ if N.Framework then
 end
 
 -- ── Phase 6 : AI ──────────────────────────────────────
-print("[NexusESP] AI...")
+print("[Aurora] AI...")
 N.LearningEngine = load("AI/Core/LearningEngine.lua")
 N.PatternEngine  = load("AI/Core/PatternEngine.lua")
 N.DecisionTree   = load("AI/Core/DecisionTree.lua")
@@ -131,7 +131,7 @@ if N.PerfectHuman   then N.PerfectHuman.Init(aiDeps)   end
 if N.BotCore        then N.BotCore.Init(aiDeps)        end
 
 -- ── Phase 7 : ESP ─────────────────────────────────────
-print("[NexusESP] ESP...")
+print("[Aurora] ESP...")
 N.ESP = load("Modules/ESP/ESP.lua")
 if N.ESP then
     N.ESP.Init({Utils=N.Utils, Config=N.Config, EventBus=N.EventBus})
@@ -139,7 +139,7 @@ if N.ESP then
 end
 
 -- ── Phase 8 : Combat ──────────────────────────────────
-print("[NexusESP] Combat...")
+print("[Aurora] Combat...")
 N.Aimbot     = load("Modules/Combat/Aimbot.lua")
 N.SilentAim  = load("Modules/Combat/SilentAim.lua")
 N.Triggerbot = load("Modules/Combat/Triggerbot.lua")
@@ -153,7 +153,7 @@ if N.RecoilCtrl then N.RecoilCtrl.Init(cDeps)  end
 if N.Humanizer  then N.Humanizer.Init(cDeps)   end
 
 -- ── Phase 9 : Movement ────────────────────────────────
-print("[NexusESP] Movement...")
+print("[Aurora] Movement...")
 N.Speed       = load("Modules/Movement/Speed.lua")
 N.Fly         = load("Modules/Movement/Fly.lua")
 N.Noclip      = load("Modules/Movement/Noclip.lua")
@@ -171,7 +171,7 @@ if N.Teleport    then N.Teleport.Init(mDeps)    end
 if N.AntiRagdoll then N.AntiRagdoll.Init(mDeps) end
 
 -- ── Phase 10 : World / Utility ────────────────────────
-print("[NexusESP] World/Utility...")
+print("[Aurora] World/Utility...")
 N.FullBright    = load("Modules/World/FullBright.lua")
 N.NoFog         = load("Modules/World/NoFog.lua")
 N.ItemESP       = load("Modules/World/ItemESP.lua")
@@ -201,7 +201,7 @@ if N.FPSUnlock and N.Config.Current.FPSUnlock and N.Config.Current.FPSUnlock.Ena
 end
 
 -- ── Phase 11 : Security finale ────────────────────────
-print("[NexusESP] Security...")
+print("[Aurora] Security...")
 N.PanicKey    = load("Security/PanicKey.lua")
 N.StealthMode = load("Security/StealthMode.lua")
 local sDeps   = {Config=N.Config, AdminDetector=N.AdminDetector, Notify=N.Notifications}
@@ -228,12 +228,12 @@ if N.AdminDetector then
 end
 
 -- ── Phase 12 : Game Specific ──────────────────────────
-print("[NexusESP] Game Specific...")
+print("[Aurora] Game Specific...")
 N.GameDetector = load("Game/Detector.lua")
 if N.GameDetector then
     N.GameDetector.Init({Notify=N.Notifications, Utils=N.Utils})
     local gameId = N.GameDetector.Detect()
-    print("[NexusESP] Jeu : "..tostring(gameId))
+    print("[Aurora] Jeu : "..tostring(gameId))
 
     local gMod
     if     gameId == "DaHood"        then gMod = load("Game/Games/DaHood/Init.lua")
@@ -251,9 +251,9 @@ end
 -- ── Prêt ──────────────────────────────────────────────
 task.wait(0.5)
 if N.Notifications then
-    N.Notifications.Success("NexusESP v"..VERSION, "Chargé ! Appuie sur Insert", 5)
+    N.Notifications.Success("Aurora v"..VERSION, "Chargé ! Appuie sur Insert 🚀", 5)
 end
 
 print("╔══════════════════════════════╗")
-print("║  NexusESP v"..VERSION.." — PRÊT  ║")
+print("║  Aurora v"..VERSION.." — PRÊT  ║")
 print("╚══════════════════════════════╝")
