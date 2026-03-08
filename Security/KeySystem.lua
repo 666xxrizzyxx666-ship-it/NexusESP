@@ -25,6 +25,7 @@ local function mkStroke(p, col, t)
     local s = Instance.new("UIStroke", p)
     s.Color = col or C(91,107,248)
     s.Thickness = t or 1
+    return s  -- FIX : retourne le stroke
 end
 
 local function saveKey(key)
@@ -43,22 +44,28 @@ end
 -- Validation — dev mode si Firebase absent
 local function doValidate(key, callback)
     if not callback then return end
-    local userId = LP and LP.UserId or 0
-    if BYPASS_USERID[userId] then callback(true,"owner"); return end
+    -- Tout dans un pcall global pour ne jamais crasher
+    local ok, err = pcall(function()
+        local userId = LP and LP.UserId or 0
+        if BYPASS_USERID[userId] then callback(true,"owner"); return end
 
-    local ok2, Firebase = pcall(function()
-        return getgenv().NexusESP and getgenv().NexusESP.Firebase or nil
+        local Firebase = getgenv().NexusESP and getgenv().NexusESP.Firebase
+        if not Firebase or type(Firebase.ValidateKey) ~= "function" then
+            callback(true, "dev"); return
+        end
+
+        local ok3, result = pcall(Firebase.ValidateKey, Firebase, key)
+        if ok3 and type(result) == "table" and result.valid then
+            saveKey(key)
+            callback(true, result.tier or "free")
+        else
+            callback(false, (type(result) == "table" and result.reason) or "Clé invalide")
+        end
     end)
-    if not ok2 or not Firebase or not Firebase.ValidateKey then
-        callback(true, "dev"); return
-    end
-
-    local ok3, result = pcall(Firebase.ValidateKey, Firebase, key)
-    if ok3 and result and result.valid then
-        saveKey(key)
-        callback(true, result.tier or "free")
-    else
-        callback(false, (ok3 and result and result.reason) or "Clé invalide")
+    if not ok then
+        -- Erreur inattendue → dev bypass
+        print("[Aurora/Key] Erreur validation : "..tostring(err))
+        pcall(callback, true, "dev")
     end
 end
 
@@ -191,10 +198,10 @@ function KeySystem.Show(callback)
     input.ClearTextOnFocus       = false
 
     input.Focused:Connect(function()
-        TweenS:Create(is, TweenInfo.new(0.15), {Color=C(91,107,248)}):Play()
+        if is then pcall(function() TweenS:Create(is, TweenInfo.new(0.15), {Color=C(91,107,248)}):Play() end) end
     end)
     input.FocusLost:Connect(function()
-        TweenS:Create(is, TweenInfo.new(0.15), {Color=C(50,50,90)}):Play()
+        if is then pcall(function() TweenS:Create(is, TweenInfo.new(0.15), {Color=C(50,50,90)}):Play() end) end
     end)
 
     -- Status
@@ -222,10 +229,10 @@ function KeySystem.Show(callback)
     mkCorner(valBtn, UDim.new(0,8))
 
     valBtn.MouseEnter:Connect(function()
-        TweenS:Create(valBtn, TweenInfo.new(0.1), {BackgroundColor3=C(110,128,255)}):Play()
+        pcall(function() TweenS:Create(valBtn, TweenInfo.new(0.1), {BackgroundColor3=C(110,128,255)}):Play() end)
     end)
     valBtn.MouseLeave:Connect(function()
-        TweenS:Create(valBtn, TweenInfo.new(0.1), {BackgroundColor3=C(91,107,248)}):Play()
+        pcall(function() TweenS:Create(valBtn, TweenInfo.new(0.1), {BackgroundColor3=C(91,107,248)}):Play() end)
     end)
 
     -- Bouton get key
