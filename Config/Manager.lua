@@ -320,4 +320,13 @@ function Manager:Set(key, value)
     Manager:Save()
 end
 
+-- ── SetAll — charge un profil entier ──────────────────
+function Manager.SetAll(data)
+    if type(data) ~= "table" then return end
+    for k, v in pairs(data) do
+        Manager.Current[k] = v
+    end
+    pcall(function() Manager:Save() end)
+end
+
 return Manager
