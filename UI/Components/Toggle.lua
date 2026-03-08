@@ -130,7 +130,12 @@ function Toggle:Set(val)
         Theme.Colors.Accent,
         Theme.Colors.SurfaceAlt
     )
-    pcall(self.callback, val)
+    pcall(function()
+        local ok, err = pcall(self.callback, val)
+        if not ok then
+            warn("[Toggle] Callback error ("..tostring(self.label).."): "..tostring(err))
+        end
+    end)
 end
 
 function Toggle:Get()
