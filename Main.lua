@@ -5,7 +5,7 @@
 --          Charge et connecte tous les modules
 -- ══════════════════════════════════════════════════════
 
-local VERSION = "3.0.8"
+local VERSION = "3.0.9"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 print("╔══════════════════════════════╗")
@@ -48,17 +48,25 @@ end
 
 -- ── Phase 3 : Network / Key ───────────────────────────
 print("[Aurora] Network/Key...")
-N.Firebase  = load("Network/Firebase.lua")
-N.Updater   = load("Network/Updater.lua")
-N.KeySystem = load("Security/KeySystem.lua")
-if N.KeySystem then
-    local valid = N.KeySystem.Validate()
-    if not valid then warn("[Aurora] Clé invalide — arrêt"); return end
-end
-N.Detector     = load("Security/Detector.lua")
-N.GenericBypass = load("Security/GenericBypass.lua")
-if N.Detector      then N.Detector.Init({Config=N.Config}) end
-if N.GenericBypass then N.GenericBypass.Init() end
+-- Firebase chargé mais jamais bloquant
+pcall(function() N.Firebase = load("Network/Firebase.lua") end)
+pcall(function() N.Updater  = load("Network/Updater.lua")  end)
+-- Key system — chargé mais jamais bloquant
+pcall(function()
+    N.KeySystem = load("Security/KeySystem.lua")
+    if N.KeySystem and N.KeySystem.Validate then
+        N.KeySystem.Validate()
+    end
+end)
+-- Security détection — chargée mais jamais bloquante
+pcall(function()
+    N.Detector = load("Security/Detector.lua")
+    if N.Detector then N.Detector.Init({Config=N.Config}) end
+end)
+pcall(function()
+    N.GenericBypass = load("Security/GenericBypass.lua")
+    if N.GenericBypass then N.GenericBypass.Init() end
+end)
 
 -- ── Phase 4 : Utils ───────────────────────────────────
 N.Utils = load("Modules/Utils.lua")
