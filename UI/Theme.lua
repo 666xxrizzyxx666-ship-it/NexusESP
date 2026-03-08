@@ -126,7 +126,7 @@ Theme.Anim = {
 
 -- ── Tailles UI ────────────────────────────────────────
 Theme.Size = {
-    SidebarWidth  = 52,
+    SidebarWidth  = 46,
     WindowWidth   = 650,
     WindowHeight  = 480,
     HeaderHeight  = 50,
