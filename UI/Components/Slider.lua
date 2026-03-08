@@ -31,7 +31,7 @@ function Slider.new(parent, opts)
     self.step     = opts.step     or 1
     self.suffix   = opts.suffix   or ""
     self.label    = opts.label    or "Slider"
-    self.callback = opts.callback or function() end
+    self.callback = opts.onChange or opts.onClick or opts.callback or function() end
     self.dragging = false
 
     -- Container
