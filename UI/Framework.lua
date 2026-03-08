@@ -164,7 +164,7 @@ local function createSidebarItem(parent, icon, tabName, index)
     local ico = Instance.new("TextLabel", btn)
     ico.Text                = icon
     ico.Font                = Enum.Font.GothamBold
-    ico.TextSize            = 18
+    ico.TextSize            = 11
     ico.TextColor3          = Theme.Colors.TextSub
     ico.BackgroundTransparency = 1
     ico.BorderSizePixel     = 0
@@ -257,14 +257,14 @@ function Framework.Init(deps)
 
     -- ── Tabs par défaut ───────────────────────────────
     local defaultTabs = {
-        {"ESP",      "👁"},
-        {"Combat",   "🎯"},
-        {"Movement", "🏃"},
-        {"World",    "🌍"},
-        {"AI",       "🧠"},
-        {"Bot",      "🤖"},
-        {"Utility",  "🔧"},
-        {"Config",   "⚙"},
+        {"ESP",      "ESP"},
+        {"Combat",   "CMB"},
+        {"Movement", "MOV"},
+        {"World",    "WLD"},
+        {"AI",       "AI"},
+        {"Bot",      "BOT"},
+        {"Utility",  "UTL"},
+        {"Config",   "CFG"},
     }
     for _, t in ipairs(defaultTabs) do
         Framework.AddTab(t[1], t[2])
@@ -337,7 +337,7 @@ function Framework._buildGui()
 
     -- Version
     local ver = Instance.new("TextLabel", header)
-    ver.Text                = "v3.0.9"
+    ver.Text = "v3.1.1"
     ver.Font                = Theme.Fonts.Regular
     ver.TextSize            = Theme.TextSize.Tiny
     ver.TextColor3          = Theme.Colors.TextMuted
