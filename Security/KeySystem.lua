@@ -109,14 +109,6 @@ function KeySystem.Show(callback)
     })
     grad.Rotation = 90
 
-    -- Barre accent gauche
-    local acBar = Instance.new("Frame", win)
-    acBar.BackgroundColor3 = C(91,107,248)
-    acBar.BorderSizePixel  = 0
-    acBar.Size             = UDim2.fromOffset(3,290)
-    acBar.Position         = UDim2.fromOffset(0,0)
-    mkCorner(acBar, UDim.new(0,2))
-
     -- Icône maison (asset simple dispo partout)
     local logoImg = Instance.new("ImageLabel", win)
     logoImg.Image = "rbxassetid://4483345998"
