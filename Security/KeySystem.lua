@@ -40,17 +40,15 @@ end
 local function validate(key, callback)
     if not callback then return end
 
-    -- Safety : LP peut être nil sur certains exécuteurs
     local userId = LP and LP.UserId or 0
-
     if BYPASS_USERID[userId] then
         callback(true, "owner")
         return
     end
 
+    -- Dev mode : Firebase absent ou pas configuré → accepte tout
     local Firebase = getgenv().NexusESP and getgenv().NexusESP.Firebase
-    if not Firebase then
-        -- Dev mode : pas de Firebase → accepte tout
+    if not Firebase or not Firebase.ValidateKey then
         callback(true, "dev")
         return
     end
@@ -169,7 +167,7 @@ function KeySystem.Show(callback)
     input.PlaceholderText        = "XXXX-XXXX-XXXX-XXXX"
     input.PlaceholderColor3      = C(80,80,110)
     input.Text                   = ""
-    input.Font                   = Enum.Font.GothamMono
+    input.Font                   = Enum.Font.Code
     input.TextSize               = 14
     input.TextColor3             = C(255,255,255)
     input.BackgroundTransparency = 1
