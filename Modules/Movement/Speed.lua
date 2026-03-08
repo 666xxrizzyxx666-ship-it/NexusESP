@@ -30,7 +30,7 @@ function Speed.Init(deps)
         end
     end)
 
-    print("[Speed] Initialisé ✓")
+    task.defer(function()end)
 end
 
 function Speed._apply()
@@ -52,14 +52,14 @@ function Speed.Enable()
     if enabled then return end
     enabled = true
     Speed._apply()
-    print("[Speed] Activé ✓")
+    task.defer(function()end)
 end
 
 function Speed.Disable()
     if not enabled then return end
     enabled = false
     Speed._reset()
-    print("[Speed] Désactivé")
+    task.defer(function()end)
 end
 
 function Speed.Toggle()
@@ -71,6 +71,7 @@ function Speed.SetValue(v)
     if hum and enabled then hum.WalkSpeed = v end
 end
 
+function Speed.SetSpeed(v) Speed.SetValue(v) end
 function Speed.IsEnabled() return enabled end
 
 return Speed
