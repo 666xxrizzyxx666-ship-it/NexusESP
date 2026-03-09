@@ -1,6 +1,5 @@
--- Aurora — Chams.lua v3.1 — stable, pas de scintillement
+-- Aurora — Chams.lua v3.1
 local Chams = {}
-
 local Players = game:GetService("Players")
 local LP      = Players.LocalPlayer
 
@@ -8,143 +7,145 @@ local enabled    = false
 local style      = "Neon"
 local enemyColor = Color3.fromRGB(255, 60, 60)
 local teamColor  = Color3.fromRGB(60, 255, 100)
-local saved      = {}   -- [player][part] = original data
-local applied    = {}   -- [player] = true si déjà appliqué
+local originals  = {}  -- [part] = {mat, col, trans, shadow}
 
-local STYLES = {
-    Neon      = { material = Enum.Material.Neon,           trans = 0    },
-    Flat      = { material = Enum.Material.SmoothPlastic,  trans = 0    },
-    Glass     = { material = Enum.Material.Glass,          trans = 0.3  },
-    Wireframe = { material = Enum.Material.Neon,           trans = 0.8  },
+local MATS = {
+    Neon      = Enum.Material.Neon,
+    Flat      = Enum.Material.SmoothPlastic,
+    Glass     = Enum.Material.Glass,
+    Wireframe = Enum.Material.Neon,
+}
+local TRANS = {
+    Neon=0, Flat=0, Glass=0.35, Wireframe=0.8
 }
 
-local function isEnemy(player)
-    if LP.Team and player.Team and LP.Team == player.Team then return false end
-    return true
+local function isEnemy(p)
+    return not (LP.Team and p.Team and LP.Team == p.Team)
 end
 
-local function applyToPlayer(player)
-    local char = player.Character
-    if not char then return end
-    local col = isEnemy(player) and enemyColor or teamColor
-    local st  = STYLES[style] or STYLES.Neon
-    saved[player] = saved[player] or {}
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            -- Sauvegarde UNE SEULE FOIS
-            if not saved[player][part] then
-                saved[player][part] = {
-                    material = part.Material,
-                    color    = part.Color,
-                    trans    = part.Transparency,
-                    shadow   = part.CastShadow,
+local function applyChar(char, col)
+    local mat   = MATS[style]   or MATS.Neon
+    local trans = TRANS[style]  or 0
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if not originals[p] then
+                originals[p] = {
+                    mat   = p.Material,
+                    col   = p.Color,
+                    trans = p.Transparency,
+                    shadow= p.CastShadow,
                 }
             end
             pcall(function()
-                part.Material     = st.material
-                part.Color        = col
-                part.Transparency = st.trans
-                part.CastShadow   = false
+                p.Material    = mat
+                p.Color       = col
+                p.Transparency= trans
+                p.CastShadow  = false
             end)
         end
     end
-    applied[player] = true
 end
 
-local function restorePlayer(player)
-    local data = saved[player]
-    if not data then return end
-    local char = player.Character
-    if char then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and data[part] then
-                local o = data[part]
-                pcall(function()
-                    part.Material     = o.material
-                    part.Color        = o.color
-                    part.Transparency = o.trans
-                    part.CastShadow   = o.shadow
-                end)
-            end
+local function restoreChar(char)
+    if not char then return end
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") and originals[p] then
+            local o = originals[p]
+            pcall(function()
+                p.Material    = o.mat
+                p.Color       = o.col
+                p.Transparency= o.trans
+                p.CastShadow  = o.shadow
+            end)
+            originals[p] = nil
         end
     end
-    saved[player]   = nil
-    applied[player] = nil
 end
 
-local charConns = {}
+local conns = {}
+
+local function hookPlayer(player)
+    if player == LP then return end
+    if player.Character then
+        pcall(applyChar, player.Character, isEnemy(player) and enemyColor or teamColor)
+    end
+    conns[player] = player.CharacterAdded:Connect(function(char)
+        task.wait(0.25)
+        if enabled then
+            pcall(applyChar, char, isEnemy(player) and enemyColor or teamColor)
+        end
+    end)
+end
 
 function Chams.Init(deps) end
 
 function Chams.Enable()
     if enabled then return end
     enabled = true
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            pcall(applyToPlayer, p)
-            -- Re-applique uniquement à chaque nouveau perso
-            charConns[p] = p.CharacterAdded:Connect(function()
-                task.wait(0.5)
-                saved[p]   = nil
-                applied[p] = nil
-                if enabled then pcall(applyToPlayer, p) end
-            end)
-        end
-    end
-
-    charConns["added"] = Players.PlayerAdded:Connect(function(p)
-        charConns[p] = p.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if enabled then pcall(applyToPlayer, p) end
-        end)
-    end)
+    originals = {}
+    for _, p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
+    conns["pa"] = Players.PlayerAdded:Connect(hookPlayer)
 end
 
 function Chams.Disable()
     if not enabled then return end
     enabled = false
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then pcall(restorePlayer, p) end
+        if p ~= LP and p.Character then
+            pcall(restoreChar, p.Character)
+        end
     end
-    for k, c in pairs(charConns) do
+    for k, c in pairs(conns) do
         pcall(function() c:Disconnect() end)
-        charConns[k] = nil
+        conns[k] = nil
     end
-    saved = {}; applied = {}
+    originals = {}
 end
 
-function Chams.SetStyle(s)
-    style = s
+local function reapplyAll()
     if not enabled then return end
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            saved[p]   = nil
-            applied[p] = nil
-            pcall(applyToPlayer, p)
+        if p ~= LP and p.Character then
+            -- Reset originals pour ce perso pour forcer re-save
+            for _, part in ipairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") then originals[part] = nil end
+            end
+            pcall(applyChar, p.Character, isEnemy(p) and enemyColor or teamColor)
         end
     end
 end
 
+function Chams.SetStyle(s)
+    style = s
+    reapplyAll()
+end
+
 function Chams.SetEnemyColor(c)
     enemyColor = c
-    if not enabled then return end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and isEnemy(p) then
-            saved[p] = nil; applied[p] = nil
-            pcall(applyToPlayer, p)
+    if enabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character and isEnemy(p) then
+                for _, part in ipairs(p.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.Color = c end)
+                    end
+                end
+            end
         end
     end
 end
 
 function Chams.SetTeamColor(c)
     teamColor = c
-    if not enabled then return end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and not isEnemy(p) then
-            saved[p] = nil; applied[p] = nil
-            pcall(applyToPlayer, p)
+    if enabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character and not isEnemy(p) then
+                for _, part in ipairs(p.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.Color = c end)
+                    end
+                end
+            end
         end
     end
 end
