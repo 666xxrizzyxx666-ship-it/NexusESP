@@ -1,134 +1,118 @@
--- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Modules/World/ItemESP.lua
---   📁 Dossier : Modules/World/
---   Rôle : ESP des items / véhicules / NPCs
--- ══════════════════════════════════════════════════════
-
+-- Aurora — Modules/World/ItemESP.lua v2.0
+-- Scan lent (pas chaque frame) pour eviter le lag
 local ItemESP = {}
 
 local RunService = game:GetService("RunService")
 local Camera     = workspace.CurrentCamera
-local Players    = game:GetService("Players")
-local LP         = Players.LocalPlayer
+local LP         = game:GetService("Players").LocalPlayer
 
-local Config  = nil
-local enabled = false
-local conn    = nil
-local items   = {}
+local enabled  = false
+local maxDist  = 300
+local conn     = nil
+local items    = {}   -- { {part, label} }
+local lastScan = 0
 
-local function newText()
+local KEYWORDS = {
+    "gun","pistol","rifle","weapon","knife","bat","sword",
+    "money","cash","drug","item","pickup","loot","ammo","health",
+    "med","grenade","bomb","tool"
+}
+
+local function matchesKeyword(name)
+    local low = name:lower()
+    for _, k in ipairs(KEYWORDS) do
+        if low:find(k) then return true end
+    end
+    return false
+end
+
+local function newLabel(name)
     local t = Drawing.new("Text")
-    t.Visible = false
-    t.Outline = false
-    t.Center  = true
-    t.Font    = Drawing.Fonts.Plex
+    t.Visible   = false
+    t.Outline   = true
+    t.Center    = true
+    t.Font      = Drawing.Fonts.Plex
+    t.Size      = 12
+    t.Color     = Color3.fromRGB(255, 220, 50)
+    t.Text      = name
     return t
 end
 
-local function newLine()
-    local l = Drawing.new("Line")
-    l.Visible   = false
-    l.Thickness = 1
-    l.Outline   = false
-    return l
+local function clearItems()
+    for _, entry in ipairs(items) do
+        pcall(function() entry.label:Remove() end)
+    end
+    items = {}
 end
 
-local function getRoot()
-    local char = LP.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
+local function scanWorld()
+    clearItems()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Tool") or matchesKeyword(obj.Name) then
+            local part = obj:IsA("BasePart") and obj
+                or (obj:IsA("Model") and obj:FindFirstChildOfClass("BasePart"))
+                or (obj:IsA("Tool") and obj:FindFirstChildOfClass("BasePart"))
+            if part and part:IsDescendantOf(workspace) and not part:IsDescendantOf(game:GetService("Players").LocalPlayer.Character or workspace) then
+                table.insert(items, { part = part, label = newLabel(obj.Name) })
+            end
+        end
+    end
 end
 
-function ItemESP.Init(deps)
-    Config = deps.Config or Config
-    print("[ItemESP] Initialisé ✓")
+local function onRender()
+    if not enabled then return end
+
+    local now = tick()
+    if now - lastScan > 3 then
+        lastScan = now
+        pcall(scanWorld)
+    end
+
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    for _, entry in ipairs(items) do
+        local part  = entry.part
+        local label = entry.label
+
+        if part and part.Parent then
+            local dist = (myRoot.Position - part.Position).Magnitude
+            if dist <= maxDist then
+                local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen and sp.Z > 0 then
+                    label.Position = Vector2.new(sp.X, sp.Y - 14)
+                    label.Text     = entry.part.Parent and entry.part.Parent.Name or part.Name
+                    label.Text     = label.Text .. " [" .. math.floor(dist) .. "m]"
+                    label.Visible  = true
+                else
+                    label.Visible = false
+                end
+            else
+                label.Visible = false
+            end
+        else
+            label.Visible = false
+        end
+    end
 end
+
+function ItemESP.Init(deps) end
 
 function ItemESP.Enable()
-    if enabled then return end
-    enabled = true
-
-    conn = RunService.RenderStepped:Connect(function()
-        local cfg = Config and Config.Current and Config.Current.ItemESP
-        if not cfg then return end
-
-        local root   = getRoot()
-        local maxDist = cfg.MaxDist or 500
-        local color   = cfg.Color and Color3.fromRGB(cfg.Color.R, cfg.Color.G, cfg.Color.B) or Color3.fromRGB(255,215,0)
-
-        -- Cherche les tools dans workspace
-        for _, item in ipairs(workspace:GetDescendants()) do
-            if item:IsA("Tool") or item:IsA("Model") then
-                local part = item:FindFirstChildOfClass("BasePart")
-                if part then
-                    local dist = root and (root.Position - part.Position).Magnitude or 9999
-
-                    if dist <= maxDist then
-                        local screen, onScreen = Camera:WorldToViewportPoint(part.Position)
-
-                        if onScreen then
-                            local key = tostring(item)
-                            if not items[key] then
-                                items[key] = {
-                                    label  = newText(),
-                                    tracer = newLine(),
-                                    ref    = item,
-                                }
-                            end
-
-                            local d = items[key]
-                            local distStr = math.floor(dist).."m"
-
-                            d.label.Text     = item.Name.." ["..distStr.."]"
-                            d.label.Size     = 11
-                            d.label.Color    = color
-                            d.label.Position = Vector2.new(screen.X, screen.Y - 10)
-                            d.label.Visible  = true
-
-                            d.tracer.From    = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                            d.tracer.To      = Vector2.new(screen.X, screen.Y)
-                            d.tracer.Color   = color
-                            d.tracer.Visible = false -- optionnel
-                        else
-                            local key2 = tostring(item)
-                            if items[key2] then
-                                items[key2].label.Visible  = false
-                                items[key2].tracer.Visible = false
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Nettoie les items supprimés
-        for key, d in pairs(items) do
-            if not d.ref or not d.ref.Parent then
-                pcall(function() d.label:Remove()  end)
-                pcall(function() d.tracer:Remove() end)
-                items[key] = nil
-            end
-        end
-    end)
-
-    print("[ItemESP] Activé ✓")
+    if conn then return end
+    enabled  = true
+    lastScan = 0
+    conn = RunService.RenderStepped:Connect(onRender)
 end
 
 function ItemESP.Disable()
-    if not enabled then return end
     enabled = false
     if conn then conn:Disconnect(); conn = nil end
-    for _, d in pairs(items) do
-        pcall(function() d.label:Remove()  end)
-        pcall(function() d.tracer:Remove() end)
-    end
-    items = {}
-    print("[ItemESP] Désactivé")
+    clearItems()
 end
 
-function ItemESP.Toggle()
-    if enabled then ItemESP.Disable() else ItemESP.Enable() end
+function ItemESP.SetMaxDist(v)
+    maxDist = v
 end
-
-function ItemESP.IsEnabled() return enabled end
 
 return ItemESP
