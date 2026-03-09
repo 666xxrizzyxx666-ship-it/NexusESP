@@ -16,14 +16,18 @@ local opt = {
     Box          = false,
     BoxStyle     = "2D Normal",
     Skeleton     = false,
+    SkeletonHP   = true,   -- couleur skeleton par HP
     Tracers      = false,
+    TracerStyle  = "Ligne",
     Name         = false,
+    Weapon       = false,
     Distance     = false,
     Health       = false,
     HealthPos    = "Gauche",
     TeamCheck    = false,
     WallCheck    = false,
     FOVCircle    = false,
+    FOVRadius    = 120,
     MaxDist      = 500,
     EnemyColor   = Color3.fromRGB(255, 80, 80),
     TeamColor    = Color3.fromRGB(80, 255, 120),
@@ -52,6 +56,7 @@ local function renderFOV()
     local cam = workspace.CurrentCamera
     local cx = cam.ViewportSize.X / 2
     local cy = cam.ViewportSize.Y / 2
+    local r   = opt.FOVRadius or 120
     local show = opt.FOVCircle
     for i = 1, FOV_SEG do
         local l = fovLines[i]
@@ -59,8 +64,8 @@ local function renderFOV()
         if show then
             local a1 = (i-1)/FOV_SEG * math.pi*2
             local a2 = i    /FOV_SEG * math.pi*2
-            l.From    = Vector2.new(cx + math.cos(a1)*FOV_RADIUS, cy + math.sin(a1)*FOV_RADIUS)
-            l.To      = Vector2.new(cx + math.cos(a2)*FOV_RADIUS, cy + math.sin(a2)*FOV_RADIUS)
+            l.From    = Vector2.new(cx + math.cos(a1)*r, cy + math.sin(a1)*r)
+            l.To      = Vector2.new(cx + math.cos(a2)*r, cy + math.sin(a2)*r)
             l.Visible = true
         else
             l.Visible = false
@@ -231,17 +236,20 @@ function ESP._render()
                     and player.Team ~= nil
                     and LP.Team == player.Team
 
-                -- Wall check — utilise GetPartsObscuringTarget (méthode officielle)
+                -- Wall check — raycast simple vers HumanoidRootPart
                 local visible = true
                 if opt.WallCheck and root then
-                    local ok, parts = pcall(function()
-                        return Camera:GetPartsObscuringTarget(
-                            {rootPos},
-                            {LP.Character, char}
-                        )
+                    local ok, result = pcall(function()
+                        local origin = Camera.CFrame.Position
+                        local dir    = rootPos - origin
+                        local params = RaycastParams.new()
+                        params.FilterDescendantsInstances = {LP.Character, char}
+                        params.FilterType = Enum.RaycastFilterType.Exclude
+                        return workspace:Raycast(origin, dir, params)
                     end)
-                    -- visible = aucun mur devant le joueur
-                    visible = ok and (#parts == 0)
+                    -- nil = rien entre camera et joueur = visible
+                    -- non-nil = un mur bloque
+                    visible = ok and (result == nil)
                 end
 
                 local show = opt.Enabled and alive and onScreen
@@ -256,10 +264,17 @@ function ESP._render()
                     else
                         local col = getTeamColor(player)
 
+                        -- Arme tenue par le joueur
+                        local weaponName = ""
+                        if opt.Weapon then
+                            local tool = char:FindFirstChildOfClass("Tool")
+                            weaponName = tool and tool.Name or ""
+                        end
+
                         -- Box
                         if M.Box and d.drawings.box then
                             if opt.Box and opt.BoxStyle == "2D Normal" then
-                                M.Box.Update(d.drawings.box, bb, col, opt.BoxColor)
+                                M.Box.Update(d.drawings.box, bb, col, opt.BoxColor, dist)
                             else
                                 M.Box.Hide(d.drawings.box)
                             end
@@ -268,25 +283,25 @@ function ESP._render()
                         -- CornerBox
                         if M.CornerBox and d.drawings.corner then
                             if opt.Box and opt.BoxStyle == "Corner Box" then
-                                M.CornerBox.Update(d.drawings.corner, bb, col, opt.BoxColor)
+                                M.CornerBox.Update(d.drawings.corner, bb, col, opt.BoxColor, dist)
                             else
                                 M.CornerBox.Hide(d.drawings.corner)
                             end
                         end
 
-                        -- Skeleton
+                        -- Skeleton (couleur HP si option activée)
                         if M.Skeleton and d.drawings.skeleton then
                             if opt.Skeleton then
-                                M.Skeleton.Update(d.drawings.skeleton, char, col)
+                                M.Skeleton.Update(d.drawings.skeleton, char, col, opt.SkeletonHP)
                             else
                                 M.Skeleton.Hide(d.drawings.skeleton)
                             end
                         end
 
-                        -- Tracers
+                        -- Tracers avec style
                         if M.Tracers and d.drawings.tracers then
                             if opt.Tracers then
-                                M.Tracers.Update(d.drawings.tracers, bb, opt.TracerColor)
+                                M.Tracers.Update(d.drawings.tracers, bb, opt.TracerColor, opt.TracerStyle)
                             else
                                 M.Tracers.Hide(d.drawings.tracers)
                             end
@@ -302,10 +317,10 @@ function ESP._render()
                             end
                         end
 
-                        -- Name
+                        -- Name + arme
                         if M.Name and d.drawings.name then
                             if opt.Name then
-                                M.Name.Update(d.drawings.name, bb, player.Name, col)
+                                M.Name.Update(d.drawings.name, bb, player.Name, col, weaponName)
                             else
                                 M.Name.Hide(d.drawings.name)
                             end
