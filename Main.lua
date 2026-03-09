@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.6"
+local VERSION = "4.0.7"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
