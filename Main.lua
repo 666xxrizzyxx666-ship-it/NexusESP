@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.10"
+local VERSION = "5.0.0"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -966,14 +966,93 @@ end)
 
 -- ── Tab jeu spécifique ────────────────────────────
 if Tabs.Game then
-    Tabs.Game:AddSection("Options "..detectedGame)
-    Tabs.Game:AddParagraph({
-        Title   = detectedGame.." détecté !",
-        Content = "Les options spécifiques à ce jeu\nseront disponibles ici.",
-    })
-end
+    local GM = N.CurrentGame
 
--- ── Tab par défaut ────────────────────────────────
+    -- ══ ESP ══════════════════════════════════════════
+    Tabs.Game:AddSection("ESP Joueurs")
+    Tabs.Game:AddToggle("DHMoneyESP",  {Title="💰 Money ESP (cash + banque)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("MoneyESP",v) end end})
+    Tabs.Game:AddToggle("DHWantedESP", {Title="⭐ Wanted ESP",Default=false,
+        Callback=function(v) if GM then GM.SetOption("WantedESP",v) end end})
+    Tabs.Game:AddToggle("DHOfficerESP",{Title="🚔 Officer ESP (cops)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("OfficerESP",v) end end})
+    Tabs.Game:AddToggle("DHWeaponESP", {Title="🔫 Weapon ESP",Default=false,
+        Callback=function(v) if GM then GM.SetOption("WeaponESP",v) end end})
+    Tabs.Game:AddToggle("DHBoxingESP", {Title="🥊 Boxing Level ESP",Default=false,
+        Callback=function(v) if GM then GM.SetOption("BoxingESP",v) end end})
+    Tabs.Game:AddToggle("DHStatsESP",  {Title="📋 Task ESP",Default=false,
+        Callback=function(v) if GM then GM.SetOption("StatsESP",v) end end})
+
+    -- ══ ARMES (noms exacts dump) ══════════════════════
+    Tabs.Game:AddSection("Armes — Valeurs Réelles")
+    Tabs.Game:AddToggle("DHInfAmmo",   {Title="∞ Infinite Ammo (Ammo+MaxAmmo=999)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("InfiniteAmmo",v) end end})
+    Tabs.Game:AddToggle("DHOneShot",   {Title="💀 One Shot (Damage=9999)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("OneShot",v) end end})
+    Tabs.Game:AddToggle("DHRapidFire", {Title="⚡ Rapid Fire (ShootingCooldown=0.001)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("RapidFire",v) end end})
+    Tabs.Game:AddToggle("DHInfRange",  {Title="🎯 Infinite Range (Range=9999)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("InfiniteRange",v) end end})
+    Tabs.Game:AddToggle("DHAutoShoot", {Title="🤖 Auto Shoot (fire remote ennemi proche)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("AutoShoot",v) end end})
+
+    -- ══ COMBAT MELEE ══════════════════════════════════
+    Tabs.Game:AddSection("Combat Mêlée")
+    Tabs.Game:AddToggle("DHAutoParry", {Title="🛡 Auto Parry/Block",Default=false,
+        Callback=function(v) if GM then GM.SetOption("AutoParry",v) end end})
+
+    -- ══ MOUVEMENT ════════════════════════════════════
+    Tabs.Game:AddSection("Mouvement")
+    Tabs.Game:AddToggle("DHSpeed",    {Title="🏃 Speed Hack",Default=false,
+        Callback=function(v) if GM then GM.SetOption("Speed",v) end end})
+    Tabs.Game:AddSlider("DHSpeedVal", {Title="Vitesse",Default=32,Min=16,Max=300,Rounding=0,
+        Callback=function(v) if GM then GM.SetOption("SpeedVal",v) end end})
+    Tabs.Game:AddToggle("DHFly",      {Title="✈ Fly (WASD+Space/Ctrl)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("Fly",v) end end})
+    Tabs.Game:AddSlider("DHFlySpeed", {Title="Vitesse vol",Default=50,Min=10,Max=500,Rounding=0,
+        Callback=function(v) if GM then GM.SetOption("FlySpeed",v) end end})
+    Tabs.Game:AddToggle("DHNoclip",   {Title="👻 Noclip",Default=false,
+        Callback=function(v) if GM then GM.SetOption("Noclip",v) end end})
+
+    -- ══ EXPLOITS ═════════════════════════════════════
+    Tabs.Game:AddSection("Exploits")
+    Tabs.Game:AddToggle("DHGodMode",      {Title="💀 God Mode",Default=false,
+        Callback=function(v) if GM then GM.SetOption("GodMode",v) end end})
+    Tabs.Game:AddToggle("DHFreezeWanted", {Title="🔒 Freeze Wanted",Default=false,
+        Callback=function(v) if GM then GM.SetOption("FreezeWanted",v) end end})
+    Tabs.Game:AddToggle("DHAntiWanted",   {Title="🧹 Anti Wanted auto",Default=false,
+        Callback=function(v) if GM then GM.SetOption("AntiWanted",v) end end})
+    Tabs.Game:AddButton({Title="🧹 Clear Wanted MAINTENANT",
+        Callback=function() if GM then GM.AntiWanted() end end})
+    Tabs.Game:AddToggle("DHAutoTask",     {Title="📋 Auto Task (BuyItems farm)",Default=false,
+        Callback=function(v) if GM then GM.SetOption("AutoTask",v) end end})
+    Tabs.Game:AddToggle("DHAutoTapBall",  {Title="⚽ Auto TapBall",Default=false,
+        Callback=function(v) if GM then GM.SetOption("AutoTapBall",v) end end})
+    Tabs.Game:AddToggle("DHCasinoAuto",   {Title="🎰 Auto Casino",Default=false,
+        Callback=function(v) if GM then GM.SetOption("CasinoAuto",v) end end})
+    Tabs.Game:AddToggle("DHSpamBounty",   {Title="💸 Spam Bounty ennemis",Default=false,
+        Callback=function(v) if GM then GM.SetOption("SpamBounty",v) end end})
+
+    -- ══ ITEMS SPECIAUX ═══════════════════════════════
+    Tabs.Game:AddSection("Items Spéciaux")
+    Tabs.Game:AddButton({Title="🤖 IronMan Suit (Mark45)",
+        Callback=function() if GM then GM.TryIronMan() end end})
+    Tabs.Game:AddButton({Title="⚔ Light Sword",
+        Callback=function() if GM then GM.TryLightSword() end end})
+    Tabs.Game:AddButton({Title="🚴 Bike Speed Hack",
+        Callback=function() if GM then GM.TryBike() end end})
+    Tabs.Game:AddButton({Title="🌀 Mode Luffy",
+        Callback=function() if GM then GM.TryLuffy() end end})
+
+    -- ══ SERVEUR ══════════════════════════════════════
+    Tabs.Game:AddSection("Serveur")
+    Tabs.Game:AddButton({Title="🔀 Rejoindre serveur vide",
+        Callback=function()
+            if N.ServerHop then N.ServerHop.HopEmpty() end
+        end})
+
+    if GM then GM.Enable() end
+end
 Window:SelectTab(1)
 N.UI   = Window
 N.Tabs = Tabs
