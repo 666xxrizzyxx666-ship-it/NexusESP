@@ -1,82 +1,101 @@
--- Aurora v3.2.0 — Modules/ESP/Chams.lua
+-- Aurora — Modules/ESP/Chams.lua v2.0
+-- Vrais styles : Neon, Flat, Glass, Wireframe
 local Chams = {}
-local Players    = game:GetService("Players")
-local LP         = Players.LocalPlayer
-local enabled    = false
-local chamData   = {}
-local COLOR_TEAM = Color3.fromRGB(74,222,128)
-local COLOR_ENEMY= Color3.fromRGB(248,113,113)
 
-local function getTeam(player)
-    local ok,r = pcall(function() return player.Team end)
-    return ok and r or nil
+local Players = game:GetService("Players")
+local LP      = Players.LocalPlayer
+
+local enabled    = false
+local style      = "Neon"
+local enemyColor = Color3.fromRGB(255, 80, 80)
+local teamColor  = Color3.fromRGB(80, 255, 120)
+local saved      = {}  -- { [player] = { [part] = {mat, col, trans} } }
+
+local STYLES = {
+    Neon      = { material = Enum.Material.Neon,       trans = 0 },
+    Flat      = { material = Enum.Material.SmoothPlastic, trans = 0 },
+    Glass     = { material = Enum.Material.Glass,      trans = 0.4 },
+    Wireframe = { material = Enum.Material.Neon,       trans = 0.85 },
+}
+
+local function isEnemy(player)
+    if LP.Team and player.Team and LP.Team == player.Team then
+        return false
+    end
+    return true
 end
 
-local function applyChams(player)
+local function applyToChar(player)
     local char = player.Character
     if not char then return end
-    chamData[player] = chamData[player] or {}
-    local isEnemy = getTeam(player) ~= getTeam(LP)
-    local col = isEnemy and COLOR_ENEMY or COLOR_TEAM
+
+    local col   = isEnemy(player) and enemyColor or teamColor
+    local st    = STYLES[style] or STYLES.Neon
+    saved[player] = saved[player] or {}
 
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            -- Sauvegarde l'original
-            if not chamData[player][part] then
-                chamData[player][part] = {
-                    material = part.Material,
-                    color    = part.BrickColor,
-                    trans    = part.Transparency,
-                    castShadow = part.CastShadow,
+            if not saved[player][part] then
+                saved[player][part] = {
+                    material     = part.Material,
+                    color        = part.Color,
+                    transparency = part.Transparency,
+                    castShadow   = part.CastShadow,
                 }
             end
-            part.Material    = Enum.Material.Neon
-            part.BrickColor  = BrickColor.new(col)
-            part.Transparency = 0.35
-            part.CastShadow  = false
+            pcall(function()
+                part.Material     = st.material
+                part.Color        = col
+                part.Transparency = st.trans
+                part.CastShadow   = false
+            end)
         end
     end
 end
 
-local function removeChams(player)
-    local data = chamData[player]
+local function restoreChar(player)
+    local data = saved[player]
     if not data then return end
     local char = player.Character
     if char then
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and data[part] then
-                local orig = data[part]
+                local o = data[part]
                 pcall(function()
-                    part.Material    = orig.material
-                    part.BrickColor  = orig.color
-                    part.Transparency = orig.trans
-                    part.CastShadow  = orig.castShadow
+                    part.Material     = o.material
+                    part.Color        = o.color
+                    part.Transparency = o.transparency
+                    part.CastShadow   = o.castShadow
                 end)
             end
         end
     end
-    chamData[player] = nil
+    saved[player] = nil
 end
+
+local connections = {}
 
 function Chams.Init(deps) end
 
 function Chams.Enable()
     if enabled then return end
     enabled = true
+
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP then
-            pcall(applyChams, p)
-            p.CharacterAdded:Connect(function()
-                task.wait(0.5)
-                if enabled then pcall(applyChams, p) end
+            pcall(applyToChar, p)
+            connections[p] = p.CharacterAdded:Connect(function()
+                task.wait(0.3)
+                if enabled then pcall(applyToChar, p) end
             end)
         end
     end
-    Players.PlayerAdded:Connect(function(p)
+
+    connections["PlayerAdded"] = Players.PlayerAdded:Connect(function(p)
         if not enabled then return end
-        p.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if enabled then pcall(applyChams, p) end
+        connections[p] = p.CharacterAdded:Connect(function()
+            task.wait(0.3)
+            if enabled then pcall(applyToChar, p) end
         end)
     end)
 end
@@ -84,21 +103,53 @@ end
 function Chams.Disable()
     if not enabled then return end
     enabled = false
+
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then pcall(removeChams, p) end
+        if p ~= LP then pcall(restoreChar, p) end
     end
+
+    for key, conn in pairs(connections) do
+        pcall(function() conn:Disconnect() end)
+        connections[key] = nil
+    end
+    saved = {}
 end
 
-function Chams.Toggle()
-    if enabled then Chams.Disable() else Chams.Enable() end
-end
-
-function Chams.SetColor(isTeam, col)
-    if isTeam then COLOR_TEAM = col else COLOR_ENEMY = col end
+function Chams.SetStyle(s)
+    style = s
     if enabled then
-        Chams.Disable(); task.wait(0.05); Chams.Enable()
+        -- Réapplique le style sur tous
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                pcall(restoreChar, p)
+                pcall(applyToChar, p)
+            end
+        end
     end
 end
 
-function Chams.IsEnabled() return enabled end
+function Chams.SetEnemyColor(c)
+    enemyColor = c
+    if enabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and isEnemy(p) then
+                pcall(restoreChar, p)
+                pcall(applyToChar, p)
+            end
+        end
+    end
+end
+
+function Chams.SetTeamColor(c)
+    teamColor = c
+    if enabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and not isEnemy(p) then
+                pcall(restoreChar, p)
+                pcall(applyToChar, p)
+            end
+        end
+    end
+end
+
 return Chams
