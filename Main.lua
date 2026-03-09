@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.4"
+local VERSION = "4.0.5"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -291,77 +291,118 @@ Tabs.ESP:AddSection("Joueurs")
 
 Tabs.ESP:AddToggle("ESPEnable", {
     Title = "ESP Global", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then
+            if v then N.ESP.Enable() else N.ESP.Disable() end
+        end
+    end
 })
 Tabs.ESP:AddToggle("ESPBox", {
     Title = "Box ESP", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Box", v) end
+    end
 })
 Tabs.ESP:AddDropdown("ESPBoxStyle", {
     Title = "Style Box",
     Values = {"2D Normal", "Corner Box", "3D Box", "Cercle"},
     Default = 1,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then
+            -- désactive tous les styles box d'abord
+            N.ESP.SetOption("Box",       v == "2D Normal")
+            N.ESP.SetOption("CornerBox", v == "Corner Box")
+            -- 3D et Cercle = TODO quand module dispo
+        end
+    end
 })
 Tabs.ESP:AddToggle("ESPSkeleton", {
     Title = "Skeleton", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Skeleton", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPTracers", {
     Title = "Tracers", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Tracers", v) end
+    end
 })
 Tabs.ESP:AddDropdown("ESPTracerStyle", {
     Title = "Style Tracer",
     Values = {"Ligne", "Flèche", "Point"},
     Default = 1,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TracerStyle", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPSnapLines", {
     Title = "Snap Lines (pieds)", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("SnapLines", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPName", {
     Title = "Noms", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Name", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPDistance", {
     Title = "Distance", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Distance", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPHealth", {
     Title = "Barre de vie", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Health", v) end
+    end
 })
 Tabs.ESP:AddDropdown("ESPHealthPos", {
     Title = "Position HP Bar",
     Values = {"Gauche", "Droite", "Dessus", "Dessous"},
     Default = 1,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("HealthPos", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPWeapon", {
     Title = "Arme actuelle", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Weapon", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPLookDir", {
     Title = "Direction regard", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("LookDir", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPTeamCheck", {
     Title = "Team Check", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TeamCheck", v) end
+    end
 })
 Tabs.ESP:AddToggle("ESPWallCheck", {
     Title = "Visibles seulement", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("WallCheck", v) end
+    end
 })
 Tabs.ESP:AddToggle("FOVCircle", {
     Title = "FOV Circle", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("FOVCircle", v) end
+    end
 })
 Tabs.ESP:AddSlider("ESPMaxDist", {
     Title = "Distance Max", Default = 500, Min = 50, Max = 2000, Rounding = 0,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("MaxDist", v) end
+    end
 })
 
 -- ── Section : Chams ───────────────────────────────
@@ -369,21 +410,31 @@ Tabs.ESP:AddSection("Chams")
 
 Tabs.ESP:AddToggle("Chams", {
     Title = "Chams", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.Chams then
+            if v then N.Chams.Enable() else N.Chams.Disable() end
+        end
+    end
 })
 Tabs.ESP:AddDropdown("ChamsStyle", {
     Title = "Style Chams",
     Values = {"Neon", "Flat", "Wireframe", "Glass"},
     Default = 1,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.Chams then N.Chams.SetStyle(v) end
+    end
 })
 Tabs.ESP:AddColorpicker("ChamsColorEnemy", {
     Title = "Couleur Ennemis", Default = Color3.fromRGB(255, 80, 80),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.Chams then N.Chams.SetEnemyColor(v) end
+    end
 })
 Tabs.ESP:AddColorpicker("ChamsColorTeam", {
     Title = "Couleur Équipe", Default = Color3.fromRGB(80, 255, 120),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.Chams then N.Chams.SetTeamColor(v) end
+    end
 })
 
 -- ── Section : Couleurs ESP ────────────────────────
@@ -391,19 +442,27 @@ Tabs.ESP:AddSection("Couleurs ESP")
 
 Tabs.ESP:AddColorpicker("ESPColorEnemy", {
     Title = "Couleur Ennemis", Default = Color3.fromRGB(248, 113, 113),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("EnemyColor", v) end
+    end
 })
 Tabs.ESP:AddColorpicker("ESPColorTeam", {
     Title = "Couleur Équipe", Default = Color3.fromRGB(74, 222, 128),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TeamColor", v) end
+    end
 })
 Tabs.ESP:AddColorpicker("ESPColorBox", {
     Title = "Couleur Box", Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("BoxColor", v) end
+    end
 })
 Tabs.ESP:AddColorpicker("ESPColorTracer", {
     Title = "Couleur Tracers", Default = Color3.fromRGB(150, 150, 255),
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TracerColor", v) end
+    end
 })
 
 -- ── Section : Monde ───────────────────────────────
@@ -411,11 +470,17 @@ Tabs.ESP:AddSection("Monde")
 
 Tabs.ESP:AddToggle("ItemESP", {
     Title = "Item ESP", Default = false,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ItemESP then
+            if v then N.ItemESP.Enable() else N.ItemESP.Disable() end
+        end
+    end
 })
 Tabs.ESP:AddSlider("ItemESPDistESP", {
     Title = "Distance items", Default = 300, Min = 50, Max = 1000, Rounding = 0,
-    Callback = function(v) end -- TODO
+    Callback = function(v)
+        if N.ItemESP then N.ItemESP.SetMaxDist(v) end
+    end
 })
 
 -- ════════════════════════════════════════════════════
