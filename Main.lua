@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.2"
+local VERSION = "4.0.3"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -275,7 +275,7 @@ local Tabs = {
     World    = Window:AddTab({ Title = "World",    Icon = "globe"      }),
     AI       = Window:AddTab({ Title = "AI",       Icon = "cpu"        }),
     Utility  = Window:AddTab({ Title = "Utility",  Icon = "shield"     }),
-    Exploit  = Window:AddTab({ Title = "Exploit",  Icon = "zap"        }),
+    Exploit  = Window:AddTab({ Title = "Exploit",  Icon = "activity"   }),
     Config   = Window:AddTab({ Title = "Config",   Icon = "settings"   }),
 }
 if detectedGame ~= "Generic" then
