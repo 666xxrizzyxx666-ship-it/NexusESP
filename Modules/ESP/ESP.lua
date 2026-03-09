@@ -1,8 +1,6 @@
 -- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Modules/ESP/ESP.lua
---   📁 Dossier : Modules/ESP/
---   Rôle : Moteur ESP principal
---          Gère tous les joueurs et leurs drawings
+--   Aurora — Modules/ESP/ESP.lua  v2.0
+--   State interne propre, pas de Config dépendance
 -- ══════════════════════════════════════════════════════
 
 local ESP = {}
@@ -12,288 +10,316 @@ local RunService = game:GetService("RunService")
 local Camera     = workspace.CurrentCamera
 local LP         = Players.LocalPlayer
 
-local Utils    = nil
-local Config   = nil
-local EventBus = nil
+-- ── State interne ─────────────────────────────────────
+local opt = {
+    Enabled      = false,
+    Box          = false,
+    BoxStyle     = "2D Normal", -- "2D Normal" | "Corner Box"
+    Skeleton     = false,
+    Tracers      = false,
+    SnapLines    = false,
+    Name         = false,
+    Distance     = false,
+    Health       = false,
+    HealthPos    = "Gauche",
+    Weapon       = false,
+    LookDir      = false,
+    TeamCheck    = false,
+    WallCheck    = false,
+    FOVCircle    = false,
+    MaxDist      = 500,
+    EnemyColor   = Color3.fromRGB(255, 80, 80),
+    TeamColor    = Color3.fromRGB(80, 255, 120),
+    BoxColor     = Color3.fromRGB(255, 255, 255),
+    TracerColor  = Color3.fromRGB(255, 255, 255),
+}
 
 local playerData = {}
-local enabled    = false
 local renderConn = nil
+local Utils      = nil
 
-local REPO = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
+-- ── Submodules chargés par ESP.Init ───────────────────
+local M = {}
 
-local function loadModule(name)
-    local ok, m = pcall(function()
-        return loadstring(game:HttpGet(REPO..name, true))()
-    end)
-    return ok and m or nil
+-- ── Helpers ───────────────────────────────────────────
+local function getTeamColor(player)
+    if opt.TeamCheck and LP.Team and player.Team and LP.Team == player.Team then
+        return opt.TeamColor
+    end
+    return opt.EnemyColor
+end
+
+local function isOnScreen(pos)
+    local _, onScreen = Camera:WorldToViewportPoint(pos)
+    return onScreen
+end
+
+local function getBB(char)
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local head = char:FindFirstChild("Head")
+    if not root or not head then return nil end
+
+    local headScrn = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, head.Size.Y/2, 0))
+    local feetScrn = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+
+    local h = math.abs(headScrn.Y - feetScrn.Y)
+    if h < 5 then return nil end
+    local w  = h * 0.55
+    local cx = (headScrn.X + feetScrn.X) / 2
+
+    return {
+        x      = cx - w/2,
+        y      = headScrn.Y,
+        width  = w,
+        height = h,
+        cx     = cx,
+        cy     = headScrn.Y + h/2,
+    }
 end
 
 -- ── Init ──────────────────────────────────────────────
 function ESP.Init(deps)
-    Utils    = deps.Utils    or Utils
-    Config   = deps.Config   or Config
-    EventBus = deps.EventBus or EventBus
+    Utils = deps and deps.Utils or Utils
 
-    -- Charge les sous-modules
-    ESP.Box         = loadModule("Modules/ESP/Box.lua")
-    ESP.CornerBox   = loadModule("Modules/ESP/CornerBox.lua")
-    ESP.Skeleton    = loadModule("Modules/ESP/Skeleton.lua")
-    ESP.Tracers     = loadModule("Modules/ESP/Tracers.lua")
-    ESP.Health      = loadModule("Modules/ESP/Health.lua")
-    ESP.Name        = loadModule("Modules/ESP/Name.lua")
-    ESP.Distance    = loadModule("Modules/ESP/Distance.lua")
-    ESP.Chams       = loadModule("Modules/ESP/Chams.lua")
-
-    -- Ajoute les joueurs existants
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            ESP._addPlayer(p)
-        end
+    local REPO = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
+    local function load(p)
+        local ok, r = pcall(function()
+            return loadstring(game:HttpGet(REPO..p, true))()
+        end)
+        return ok and r or nil
     end
 
-    -- Événements joueurs
+    M.Box       = load("Modules/ESP/Box.lua")
+    M.CornerBox = load("Modules/ESP/CornerBox.lua")
+    M.Skeleton  = load("Modules/ESP/Skeleton.lua")
+    M.Tracers   = load("Modules/ESP/Tracers.lua")
+    M.Health    = load("Modules/ESP/Health.lua")
+    M.Name      = load("Modules/ESP/Name.lua")
+    M.Distance  = load("Modules/ESP/Distance.lua")
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then ESP._addPlayer(p) end
+    end
     Players.PlayerAdded:Connect(function(p)
-        ESP._addPlayer(p)
+        if p ~= LP then ESP._addPlayer(p) end
     end)
     Players.PlayerRemoving:Connect(function(p)
         ESP._removePlayer(p)
     end)
-
-    task.defer(function()end)
 end
 
--- ── Ajouter joueur ────────────────────────────────────
+-- ── Gestion joueurs ───────────────────────────────────
 function ESP._addPlayer(player)
     if playerData[player] then return end
+    playerData[player] = { drawings = {} }
 
-    playerData[player] = {
-        player   = player,
-        drawings = {},
-        enabled  = true,
-    }
-
-    -- Attend le personnage
-    if player.Character then
-        ESP._setupCharacter(player, player.Character)
-    end
-    player.CharacterAdded:Connect(function(char)
+    local function onChar(char)
         task.wait(0.1)
-        ESP._setupCharacter(player, char)
+        ESP._setupChar(player, char)
+    end
+
+    if player.Character then onChar(player.Character) end
+    player.CharacterAdded:Connect(onChar)
+    player.CharacterRemoving:Connect(function()
+        ESP._clearDrawings(player)
     end)
 end
 
--- ── Setup character ───────────────────────────────────
-function ESP._setupCharacter(player, char)
-    local data = playerData[player]
-    if not data then return end
-
-    -- Nettoie les anciens drawings
+function ESP._setupChar(player, char)
     ESP._clearDrawings(player)
+    local d = playerData[player]
+    if not d then return end
+    d.char = char
 
-    data.char = char
-
-    -- Crée les drawings pour chaque module actif
-    local cfg = Config and Config.Current or {}
-
-    if ESP.Box      then data.drawings.box      = ESP.Box.Create()         end
-    if ESP.CornerBox then data.drawings.corner  = ESP.CornerBox.Create()   end
-    if ESP.Skeleton then data.drawings.skeleton = ESP.Skeleton.Create()    end
-    if ESP.Tracers  then data.drawings.tracers  = ESP.Tracers.Create()     end
-    if ESP.Health   then data.drawings.health   = ESP.Health.Create()      end
-    if ESP.Name     then data.drawings.name     = ESP.Name.Create()        end
-    if ESP.Distance then data.drawings.distance = ESP.Distance.Create()    end
+    if M.Box       then d.drawings.box      = M.Box.Create()      end
+    if M.CornerBox then d.drawings.corner   = M.CornerBox.Create() end
+    if M.Skeleton  then d.drawings.skeleton = M.Skeleton.Create()  end
+    if M.Tracers   then d.drawings.tracers  = M.Tracers.Create()   end
+    if M.Health    then d.drawings.health   = M.Health.Create()    end
+    if M.Name      then d.drawings.name     = M.Name.Create()      end
+    if M.Distance  then d.drawings.distance = M.Distance.Create()  end
 end
 
--- ── Clear drawings ────────────────────────────────────
 function ESP._clearDrawings(player)
-    local data = playerData[player]
-    if not data then return end
-
-    for _, drawings in pairs(data.drawings) do
-        if type(drawings) == "table" then
-            for _, d in pairs(drawings) do
-                if typeof(d) == "Instance" or (type(d) == "table" and d.Remove) then
-                    pcall(function()
-                        if d.Remove then d:Remove()
-                        elseif d.Destroy then d:Destroy()
-                        end
-                    end)
-                end
-            end
-        end
+    local d = playerData[player]
+    if not d then return end
+    for key, dr in pairs(d.drawings) do
+        local mod = M[key:sub(1,1):upper()..key:sub(2)]
+        if mod and mod.Remove then pcall(mod.Remove, dr) end
     end
-    data.drawings = {}
+    d.drawings = {}
+    d.char = nil
 end
 
--- ── Remove player ─────────────────────────────────────
 function ESP._removePlayer(player)
-    if not playerData[player] then return end
     ESP._clearDrawings(player)
     playerData[player] = nil
 end
 
--- ── Render loop ───────────────────────────────────────
-function ESP._render()
-    local cfg = Config and Config.Current or {}
+function ESP._hidePlayerDrawings(d)
+    if not d then return end
+    if M.Box      and d.drawings.box      then pcall(M.Box.Hide,      d.drawings.box)      end
+    if M.CornerBox and d.drawings.corner  then pcall(M.CornerBox.Hide, d.drawings.corner)   end
+    if M.Skeleton and d.drawings.skeleton then pcall(M.Skeleton.Hide, d.drawings.skeleton)  end
+    if M.Tracers  and d.drawings.tracers  then pcall(M.Tracers.Hide,  d.drawings.tracers)   end
+    if M.Health   and d.drawings.health   then pcall(M.Health.Hide,   d.drawings.health)    end
+    if M.Name     and d.drawings.name     then pcall(M.Name.Hide,     d.drawings.name)      end
+    if M.Distance and d.drawings.distance then pcall(M.Distance.Hide, d.drawings.distance)  end
+end
 
-    for player, data in pairs(playerData) do
+-- ── Render ────────────────────────────────────────────
+function ESP._render()
+    for player, d in pairs(playerData) do
         if not player or not player.Parent then
             ESP._removePlayer(player)
         else
-            local char = data.char or player.Character
+            local char = d.char or player.Character
             if not char then
-                -- Cache tout
-                ESP._hideAll(data)
+                ESP._hidePlayerDrawings(d)
             else
                 local root = char:FindFirstChild("HumanoidRootPart")
                 local hum  = char:FindFirstChildOfClass("Humanoid")
 
-                local alive   = hum and hum.Health > 0
-                local _, onScreen = Camera:WorldToViewportPoint(
-                    root and root.Position or Vector3.new(0,0,0)
-                )
-                local dist = root and Utils.GetDistance(root.Position) or 9999
-                local maxDist = (cfg.Distance and cfg.Distance.MaxDist) or 800
+                -- Vérifications
+                local alive = hum and hum.Health > 0
+                local rootPos = root and root.Position or Vector3.new()
+                local onScreen = isOnScreen(rootPos)
+                local dist = root and (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart"))
+                    and math.floor((rootPos - LP.Character.HumanoidRootPart.Position).Magnitude)
+                    or 9999
 
-                local shouldShow = enabled
-                    and data.enabled
-                    and alive
-                    and onScreen
-                    and dist <= maxDist
-                    and (not (cfg.TeamCheck) or not Utils.IsSameTeam(player))
+                -- Team check
+                local sameTeam = opt.TeamCheck
+                    and LP.Team ~= nil
+                    and player.Team ~= nil
+                    and LP.Team == player.Team
 
-                if shouldShow then
-                    local bb = Utils.GetBoundingBox(char)
-                    if bb then
+                -- Wall check
+                local visible = true
+                if opt.WallCheck and root then
+                    local ok, res = pcall(function()
+                        return workspace:FindPartOnRayWithIgnoreList(
+                            Ray.new(Camera.CFrame.Position, (rootPos - Camera.CFrame.Position).Unit * dist),
+                            {LP.Character, char}
+                        )
+                    end)
+                    visible = not (ok and res)
+                end
+
+                local show = opt.Enabled and alive and onScreen
+                    and dist <= opt.MaxDist
+                    and not sameTeam
+                    and visible
+
+                if show then
+                    local bb = getBB(char)
+                    if not bb then
+                        ESP._hidePlayerDrawings(d)
+                    else
+                        local col = getTeamColor(player)
+
                         -- Box
-                        if ESP.Box and data.drawings.box and cfg.Box and cfg.Box.Enabled then
-                            ESP.Box.Update(data.drawings.box, bb, cfg.Box)
-                        elseif data.drawings.box then
-                            ESP.Box.Hide(data.drawings.box)
+                        if M.Box and d.drawings.box then
+                            if opt.Box and opt.BoxStyle == "2D Normal" then
+                                M.Box.Update(d.drawings.box, bb, col, opt.BoxColor)
+                            else
+                                M.Box.Hide(d.drawings.box)
+                            end
                         end
 
                         -- CornerBox
-                        if ESP.CornerBox and data.drawings.corner and cfg.CornerBox and cfg.CornerBox.Enabled then
-                            ESP.CornerBox.Update(data.drawings.corner, bb, cfg.CornerBox)
-                        elseif data.drawings.corner then
-                            ESP.CornerBox.Hide(data.drawings.corner)
+                        if M.CornerBox and d.drawings.corner then
+                            if opt.Box and opt.BoxStyle == "Corner Box" then
+                                M.CornerBox.Update(d.drawings.corner, bb, col, opt.BoxColor)
+                            else
+                                M.CornerBox.Hide(d.drawings.corner)
+                            end
                         end
 
                         -- Skeleton
-                        if ESP.Skeleton and data.drawings.skeleton and cfg.Skeleton and cfg.Skeleton.Enabled then
-                            ESP.Skeleton.Update(data.drawings.skeleton, char, cfg.Skeleton)
-                        elseif data.drawings.skeleton then
-                            ESP.Skeleton.Hide(data.drawings.skeleton)
+                        if M.Skeleton and d.drawings.skeleton then
+                            if opt.Skeleton then
+                                M.Skeleton.Update(d.drawings.skeleton, char, col)
+                            else
+                                M.Skeleton.Hide(d.drawings.skeleton)
+                            end
                         end
 
                         -- Tracers
-                        if ESP.Tracers and data.drawings.tracers and cfg.Tracers and cfg.Tracers.Enabled then
-                            ESP.Tracers.Update(data.drawings.tracers, bb, cfg.Tracers)
-                        elseif data.drawings.tracers then
-                            ESP.Tracers.Hide(data.drawings.tracers)
+                        if M.Tracers and d.drawings.tracers then
+                            if opt.Tracers then
+                                M.Tracers.Update(d.drawings.tracers, bb, opt.TracerColor)
+                            else
+                                M.Tracers.Hide(d.drawings.tracers)
+                            end
                         end
 
                         -- Health
-                        if ESP.Health and data.drawings.health and cfg.Health and cfg.Health.Enabled then
-                            local hp, maxHp = Utils.GetHealth(char)
-                            ESP.Health.Update(data.drawings.health, bb, hp, maxHp, cfg.Health)
-                        elseif data.drawings.health then
-                            ESP.Health.Hide(data.drawings.health)
+                        if M.Health and d.drawings.health then
+                            if opt.Health then
+                                local hp, maxHp = hum.Health, hum.MaxHealth
+                                M.Health.Update(d.drawings.health, bb, hp, maxHp, opt.HealthPos)
+                            else
+                                M.Health.Hide(d.drawings.health)
+                            end
                         end
 
                         -- Name
-                        if ESP.Name and data.drawings.name and cfg.Name and cfg.Name.Enabled then
-                            ESP.Name.Update(data.drawings.name, bb, player.Name, cfg.Name)
-                        elseif data.drawings.name then
-                            ESP.Name.Hide(data.drawings.name)
+                        if M.Name and d.drawings.name then
+                            if opt.Name then
+                                M.Name.Update(d.drawings.name, bb, player.Name, col)
+                            else
+                                M.Name.Hide(d.drawings.name)
+                            end
                         end
 
                         -- Distance
-                        if ESP.Distance and data.drawings.distance and cfg.Distance and cfg.Distance.Enabled then
-                            ESP.Distance.Update(data.drawings.distance, bb, dist, cfg.Distance)
-                        elseif data.drawings.distance then
-                            ESP.Distance.Hide(data.drawings.distance)
+                        if M.Distance and d.drawings.distance then
+                            if opt.Distance then
+                                M.Distance.Update(d.drawings.distance, bb, dist)
+                            else
+                                M.Distance.Hide(d.drawings.distance)
+                            end
                         end
-                    else
-                        ESP._hideAll(data)
                     end
                 else
-                    ESP._hideAll(data)
+                    ESP._hidePlayerDrawings(d)
                 end
             end
         end
     end
 end
 
-function ESP._hideAll(data)
-    if not data or not data.drawings then return end
-    for moduleName, drawings in pairs(data.drawings) do
-        if ESP[moduleName:sub(1,1):upper()..moduleName:sub(2)] then
-            local mod = ESP[moduleName:sub(1,1):upper()..moduleName:sub(2)]
-            if mod and mod.Hide then
-                pcall(function() mod.Hide(drawings) end)
-            end
-        end
-    end
-end
-
--- ── Enable / Disable ──────────────────────────────────
+-- ── API publique ──────────────────────────────────────
 function ESP.Enable()
-    if enabled then return end
-    enabled    = true
+    if renderConn then return end
+    opt.Enabled = true
     renderConn = RunService.RenderStepped:Connect(ESP._render)
-    task.defer(function()end)
 end
 
 function ESP.Disable()
-    if not enabled then return end
-    enabled = false
+    opt.Enabled = false
     if renderConn then renderConn:Disconnect(); renderConn = nil end
-    -- Cache tout
-    for player, data in pairs(playerData) do
-        ESP._hideAll(data)
+    for _, d in pairs(playerData) do
+        ESP._hidePlayerDrawings(d)
     end
-    task.defer(function()end)
-end
-
-function ESP.Toggle()
-    if enabled then ESP.Disable() else ESP.Enable() end
 end
 
 function ESP.HideAll()
-    for _, data in pairs(playerData) do
-        ESP._hideAll(data)
+    for _, d in pairs(playerData) do
+        ESP._hidePlayerDrawings(d)
     end
 end
 
-function ESP.IsEnabled()
-    return enabled
-end
+function ESP.IsEnabled() return opt.Enabled end
 
--- Toggle par joueur
-function ESP.TogglePlayer(player)
-    if not playerData[player] then return end
-    playerData[player].enabled = not playerData[player].enabled
-end
-
--- SetOption — modifie une option à la volée
 function ESP.SetOption(key, value)
-    if not Config or not Config.Current then return end
-    -- MaxDist est dans Distance.MaxDist
-    if key == "MaxDist" then
-        Config.Current.Distance = Config.Current.Distance or {}
-        Config.Current.Distance.MaxDist = value
-        return
-    end
-    -- Enabled flags
-    local target = Config.Current[key]
-    if type(target) == "table" then
-        target.Enabled = value
-    else
-        -- Crée la structure si besoin
-        Config.Current[key] = {Enabled=value}
-    end
+    opt[key] = value
+end
+
+function ESP.GetOption(key)
+    return opt[key]
 end
 
 return ESP
