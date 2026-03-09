@@ -975,7 +975,19 @@ end
 
 -- ── Tab par défaut ────────────────────────────────
 Window:SelectTab(1)
-N.UI = Window
+N.UI   = Window
 N.Tabs = Tabs
+
+-- Sync des valeurs par défaut vers les modules
+-- (au cas où les callbacks Fluent n'ont pas tous tiré)
+task.defer(function()
+    if N.ESP then
+        N.ESP.SetOption("SkeletonHP",  true)
+        N.ESP.SetOption("TracerStyle", "Ligne")
+        N.ESP.SetOption("HealthPos",   "Gauche")
+        N.ESP.SetOption("FOVRadius",   120)
+        N.ESP.SetOption("MaxDist",     500)
+    end
+end)
 
 _p("Aurora v"..VERSION.." — PRÊT — "..detectedGame)
