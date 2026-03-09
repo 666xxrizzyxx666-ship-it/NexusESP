@@ -231,19 +231,17 @@ function ESP._render()
                     and player.Team ~= nil
                     and LP.Team == player.Team
 
-                -- Wall check — visible = pas de mur entre camera et joueur
+                -- Wall check — utilise GetPartsObscuringTarget (méthode officielle)
                 local visible = true
                 if opt.WallCheck and root then
-                    local ok, res = pcall(function()
-                        local origin = Camera.CFrame.Position
-                        local dir    = (rootPos - origin)
-                        local params = RaycastParams.new()
-                        params.FilterDescendantsInstances = {LP.Character, char}
-                        params.FilterType = Enum.RaycastFilterType.Exclude
-                        return workspace:Raycast(origin, dir, params)
+                    local ok, parts = pcall(function()
+                        return Camera:GetPartsObscuringTarget(
+                            {rootPos},
+                            {LP.Character, char}
+                        )
                     end)
-                    -- Si le ray touche qqch = mur = pas visible
-                    visible = not (ok and res ~= nil)
+                    -- visible = aucun mur devant le joueur
+                    visible = ok and (#parts == 0)
                 end
 
                 local show = opt.Enabled and alive and onScreen
