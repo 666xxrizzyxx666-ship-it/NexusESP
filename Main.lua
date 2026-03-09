@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.1"
+local VERSION = "4.0.2"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -274,7 +274,7 @@ local Tabs = {
     Movement = Window:AddTab({ Title = "Movement", Icon = "wind"       }),
     World    = Window:AddTab({ Title = "World",    Icon = "globe"      }),
     AI       = Window:AddTab({ Title = "AI",       Icon = "cpu"        }),
-    Utility  = Window:AddTab({ Title = "Utility",  Icon = "tool"       }),
+    Utility  = Window:AddTab({ Title = "Utility",  Icon = "shield"     }),
     Exploit  = Window:AddTab({ Title = "Exploit",  Icon = "zap"        }),
     Config   = Window:AddTab({ Title = "Config",   Icon = "settings"   }),
 }
@@ -301,10 +301,6 @@ Tabs.ESP:AddDropdown("ESPBoxStyle", {
     Title = "Style Box",
     Values = {"2D Normal", "Corner Box", "3D Box", "Cercle"},
     Default = 1,
-    Callback = function(v) end -- TODO
-})
-Tabs.ESP:AddToggle("ESPCornerBox", {
-    Title = "Corner Box", Default = false,
     Callback = function(v) end -- TODO
 })
 Tabs.ESP:AddToggle("ESPSkeleton", {
@@ -417,12 +413,8 @@ Tabs.ESP:AddToggle("ItemESP", {
     Title = "Item ESP", Default = false,
     Callback = function(v) end -- TODO
 })
-Tabs.ESP:AddToggle("FullBrightESP", {
-    Title = "Full Bright", Default = false,
-    Callback = function(v) end -- TODO
-})
-Tabs.ESP:AddToggle("NoFogESP", {
-    Title = "No Fog", Default = false,
+Tabs.ESP:AddSlider("ItemESPDistESP", {
+    Title = "Distance items", Default = 300, Min = 50, Max = 1000, Rounding = 0,
     Callback = function(v) end -- TODO
 })
 
