@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.5"
+local VERSION = "4.0.6"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -305,15 +305,16 @@ Tabs.ESP:AddToggle("ESPBox", {
 })
 Tabs.ESP:AddDropdown("ESPBoxStyle", {
     Title = "Style Box",
-    Values = {"2D Normal", "Corner Box", "3D Box", "Cercle"},
+    Values = {"2D Normal", "Corner Box"},
     Default = 1,
     Callback = function(v)
-        if N.ESP then
-            -- désactive tous les styles box d'abord
-            N.ESP.SetOption("Box",       v == "2D Normal")
-            N.ESP.SetOption("CornerBox", v == "Corner Box")
-            -- 3D et Cercle = TODO quand module dispo
-        end
+        if N.ESP then N.ESP.SetOption("BoxStyle", v) end
+    end
+})
+Tabs.ESP:AddColorpicker("ESPColorBox", {
+    Title = "Couleur Box", Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("BoxColor", v) end
     end
 })
 Tabs.ESP:AddToggle("ESPSkeleton", {
@@ -328,18 +329,10 @@ Tabs.ESP:AddToggle("ESPTracers", {
         if N.ESP then N.ESP.SetOption("Tracers", v) end
     end
 })
-Tabs.ESP:AddDropdown("ESPTracerStyle", {
-    Title = "Style Tracer",
-    Values = {"Ligne", "Flèche", "Point"},
-    Default = 1,
+Tabs.ESP:AddColorpicker("ESPColorTracer", {
+    Title = "Couleur Tracers", Default = Color3.fromRGB(255, 255, 255),
     Callback = function(v)
-        if N.ESP then N.ESP.SetOption("TracerStyle", v) end
-    end
-})
-Tabs.ESP:AddToggle("ESPSnapLines", {
-    Title = "Snap Lines (pieds)", Default = false,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("SnapLines", v) end
+        if N.ESP then N.ESP.SetOption("TracerColor", v) end
     end
 })
 Tabs.ESP:AddToggle("ESPName", {
@@ -368,18 +361,6 @@ Tabs.ESP:AddDropdown("ESPHealthPos", {
         if N.ESP then N.ESP.SetOption("HealthPos", v) end
     end
 })
-Tabs.ESP:AddToggle("ESPWeapon", {
-    Title = "Arme actuelle", Default = false,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("Weapon", v) end
-    end
-})
-Tabs.ESP:AddToggle("ESPLookDir", {
-    Title = "Direction regard", Default = false,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("LookDir", v) end
-    end
-})
 Tabs.ESP:AddToggle("ESPTeamCheck", {
     Title = "Team Check", Default = false,
     Callback = function(v)
@@ -402,6 +383,22 @@ Tabs.ESP:AddSlider("ESPMaxDist", {
     Title = "Distance Max", Default = 500, Min = 50, Max = 2000, Rounding = 0,
     Callback = function(v)
         if N.ESP then N.ESP.SetOption("MaxDist", v) end
+    end
+})
+
+-- ── Section : Couleurs joueurs ────────────────────
+Tabs.ESP:AddSection("Couleurs joueurs")
+
+Tabs.ESP:AddColorpicker("ESPColorEnemy", {
+    Title = "Ennemis", Default = Color3.fromRGB(255, 80, 80),
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("EnemyColor", v) end
+    end
+})
+Tabs.ESP:AddColorpicker("ESPColorTeam", {
+    Title = "Équipe", Default = Color3.fromRGB(80, 255, 120),
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TeamColor", v) end
     end
 })
 
@@ -434,34 +431,6 @@ Tabs.ESP:AddColorpicker("ChamsColorTeam", {
     Title = "Couleur Équipe", Default = Color3.fromRGB(80, 255, 120),
     Callback = function(v)
         if N.Chams then N.Chams.SetTeamColor(v) end
-    end
-})
-
--- ── Section : Couleurs ESP ────────────────────────
-Tabs.ESP:AddSection("Couleurs ESP")
-
-Tabs.ESP:AddColorpicker("ESPColorEnemy", {
-    Title = "Couleur Ennemis", Default = Color3.fromRGB(248, 113, 113),
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("EnemyColor", v) end
-    end
-})
-Tabs.ESP:AddColorpicker("ESPColorTeam", {
-    Title = "Couleur Équipe", Default = Color3.fromRGB(74, 222, 128),
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("TeamColor", v) end
-    end
-})
-Tabs.ESP:AddColorpicker("ESPColorBox", {
-    Title = "Couleur Box", Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("BoxColor", v) end
-    end
-})
-Tabs.ESP:AddColorpicker("ESPColorTracer", {
-    Title = "Couleur Tracers", Default = Color3.fromRGB(150, 150, 255),
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("TracerColor", v) end
     end
 })
 
