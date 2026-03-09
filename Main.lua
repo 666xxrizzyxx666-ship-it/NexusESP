@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.9"
+local VERSION = "4.0.10"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -323,10 +323,24 @@ Tabs.ESP:AddToggle("ESPSkeleton", {
         if N.ESP then N.ESP.SetOption("Skeleton", v) end
     end
 })
+Tabs.ESP:AddToggle("ESPSkeletonHP", {
+    Title = "Skeleton couleur HP", Default = true,
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("SkeletonHP", v) end
+    end
+})
 Tabs.ESP:AddToggle("ESPTracers", {
     Title = "Tracers", Default = false,
     Callback = function(v)
         if N.ESP then N.ESP.SetOption("Tracers", v) end
+    end
+})
+Tabs.ESP:AddDropdown("ESPTracerStyle", {
+    Title = "Style Tracer",
+    Values = {"Ligne", "Flèche", "Point"},
+    Default = 1,
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("TracerStyle", v) end
     end
 })
 Tabs.ESP:AddColorpicker("ESPColorTracer", {
@@ -339,6 +353,12 @@ Tabs.ESP:AddToggle("ESPName", {
     Title = "Noms", Default = false,
     Callback = function(v)
         if N.ESP then N.ESP.SetOption("Name", v) end
+    end
+})
+Tabs.ESP:AddToggle("ESPWeapon", {
+    Title = "Arme actuelle", Default = false,
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("Weapon", v) end
     end
 })
 Tabs.ESP:AddToggle("ESPDistance", {
@@ -377,6 +397,12 @@ Tabs.ESP:AddToggle("FOVCircle", {
     Title = "FOV Circle", Default = false,
     Callback = function(v)
         if N.ESP then N.ESP.SetOption("FOVCircle", v) end
+    end
+})
+Tabs.ESP:AddSlider("FOVRadius", {
+    Title = "Taille FOV Circle", Default = 120, Min = 20, Max = 500, Rounding = 0,
+    Callback = function(v)
+        if N.ESP then N.ESP.SetOption("FOVRadius", v) end
     end
 })
 Tabs.ESP:AddSlider("ESPMaxDist", {
