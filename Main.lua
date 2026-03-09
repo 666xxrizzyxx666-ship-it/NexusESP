@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.3"
+local VERSION = "4.0.4"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -348,7 +348,7 @@ Tabs.ESP:AddToggle("ESPLookDir", {
     Callback = function(v) end -- TODO
 })
 Tabs.ESP:AddToggle("ESPTeamCheck", {
-    Title = "Team Check", Default = true,
+    Title = "Team Check", Default = false,
     Callback = function(v) end -- TODO
 })
 Tabs.ESP:AddToggle("ESPWallCheck", {
@@ -448,7 +448,7 @@ Tabs.Combat:AddDropdown("AimbotBone", {
     Callback = function(v) end -- TODO
 })
 Tabs.Combat:AddToggle("AimbotTeamCheck", {
-    Title = "Team Check", Default = true,
+    Title = "Team Check", Default = false,
     Callback = function(v) end -- TODO
 })
 Tabs.Combat:AddToggle("AimbotWallCheck", {
@@ -740,7 +740,7 @@ Tabs.AI:AddButton({
 Tabs.Utility:AddSection("Anti-Détection")
 
 Tabs.Utility:AddToggle("AntiAFK", {
-    Title = "Anti AFK", Default = true,
+    Title = "Anti AFK", Default = false,
     Callback = function(v) end -- TODO
 })
 Tabs.Utility:AddToggle("StealthMode", {
@@ -808,7 +808,7 @@ Tabs.Utility:AddSlider("FakeLagAmount", {
 Tabs.Utility:AddSection("HUD")
 
 Tabs.Utility:AddToggle("Watermark", {
-    Title = "Watermark", Default = true,
+    Title = "Watermark", Default = false,
     Callback = function(v) end -- TODO
 })
 
