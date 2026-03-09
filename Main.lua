@@ -4,7 +4,7 @@
 --   GitHub : 666xxrizzyxx666-ship-it/NexusESP
 -- ══════════════════════════════════════════════════════════════════
 
-local VERSION = "4.0.0"
+local VERSION = "4.0.1"
 local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
 
 -- ── Console silencieuse ────────────────────────────────────────────
@@ -219,24 +219,40 @@ pcall(function()
     end
 end)
 
-progress(0.96, "Interface...")
+progress(0.96, "Interface (téléchargement)...")
 
 -- ══════════════════════════════════════════════════════════════════
 -- ÉTAPE 3 — FLUENT UI
 -- ══════════════════════════════════════════════════════════════════
-local Fluent = loadstring(game:HttpGet(
-    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
-))()
-local SaveManager = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
-))()
-local InterfaceManager = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
-))()
+local Fluent, SaveManager, InterfaceManager
+
+local okFluent, errFluent = pcall(function()
+    Fluent = loadstring(game:HttpGet(
+        "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+    ))()
+end)
+
+if not okFluent or not Fluent then
+    if LS then pcall(LS.Hide) end
+    warn("[Aurora] Fluent impossible à charger: "..tostring(errFluent))
+    return
+end
+
+pcall(function()
+    SaveManager = loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
+    ))()
+end)
+
+pcall(function()
+    InterfaceManager = loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
+    ))()
+end)
 
 progress(1.0, "Bienvenue dans Aurora !")
-task.wait(0.8)
-if LS then LS.Hide() end
+task.wait(0.6)
+if LS then pcall(LS.Hide) end
 
 -- ── Fenêtre principale ────────────────────────────────────────────
 local gameLabel = detectedGame ~= "Generic" and ("⚡ "..detectedGame) or "Mode Générique"
