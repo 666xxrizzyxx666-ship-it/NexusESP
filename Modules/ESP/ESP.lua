@@ -14,16 +14,13 @@ local LP         = Players.LocalPlayer
 local opt = {
     Enabled      = false,
     Box          = false,
-    BoxStyle     = "2D Normal", -- "2D Normal" | "Corner Box"
+    BoxStyle     = "2D Normal",
     Skeleton     = false,
     Tracers      = false,
-    SnapLines    = false,
     Name         = false,
     Distance     = false,
     Health       = false,
     HealthPos    = "Gauche",
-    Weapon       = false,
-    LookDir      = false,
     TeamCheck    = false,
     WallCheck    = false,
     FOVCircle    = false,
@@ -33,6 +30,43 @@ local opt = {
     BoxColor     = Color3.fromRGB(255, 255, 255),
     TracerColor  = Color3.fromRGB(255, 255, 255),
 }
+
+-- ── FOV Circle (géré par ESP) ─────────────────────────
+local fovLines   = {}
+local FOV_SEG    = 64
+local FOV_RADIUS = 120
+
+local function buildFOV()
+    for i = 1, FOV_SEG do
+        local l = Drawing.new("Line")
+        l.Visible   = false
+        l.Thickness = 1
+        l.ZIndex    = 6
+        l.Outline   = false
+        l.Color     = Color3.fromRGB(255, 255, 255)
+        fovLines[i] = l
+    end
+end
+
+local function renderFOV()
+    local cam = workspace.CurrentCamera
+    local cx = cam.ViewportSize.X / 2
+    local cy = cam.ViewportSize.Y / 2
+    local show = opt.FOVCircle
+    for i = 1, FOV_SEG do
+        local l = fovLines[i]
+        if not l then break end
+        if show then
+            local a1 = (i-1)/FOV_SEG * math.pi*2
+            local a2 = i    /FOV_SEG * math.pi*2
+            l.From    = Vector2.new(cx + math.cos(a1)*FOV_RADIUS, cy + math.sin(a1)*FOV_RADIUS)
+            l.To      = Vector2.new(cx + math.cos(a2)*FOV_RADIUS, cy + math.sin(a2)*FOV_RADIUS)
+            l.Visible = true
+        else
+            l.Visible = false
+        end
+    end
+end
 
 local playerData = {}
 local renderConn = nil
@@ -81,6 +115,7 @@ end
 -- ── Init ──────────────────────────────────────────────
 function ESP.Init(deps)
     Utils = deps and deps.Utils or Utils
+    buildFOV()
 
     local REPO = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
     local function load(p)
@@ -170,6 +205,7 @@ end
 
 -- ── Render ────────────────────────────────────────────
 function ESP._render()
+    renderFOV()
     for player, d in pairs(playerData) do
         if not player or not player.Parent then
             ESP._removePlayer(player)
@@ -195,16 +231,19 @@ function ESP._render()
                     and player.Team ~= nil
                     and LP.Team == player.Team
 
-                -- Wall check
+                -- Wall check — visible = pas de mur entre camera et joueur
                 local visible = true
                 if opt.WallCheck and root then
                     local ok, res = pcall(function()
-                        return workspace:FindPartOnRayWithIgnoreList(
-                            Ray.new(Camera.CFrame.Position, (rootPos - Camera.CFrame.Position).Unit * dist),
-                            {LP.Character, char}
-                        )
+                        local origin = Camera.CFrame.Position
+                        local dir    = (rootPos - origin)
+                        local params = RaycastParams.new()
+                        params.FilterDescendantsInstances = {LP.Character, char}
+                        params.FilterType = Enum.RaycastFilterType.Exclude
+                        return workspace:Raycast(origin, dir, params)
                     end)
-                    visible = not (ok and res)
+                    -- Si le ray touche qqch = mur = pas visible
+                    visible = not (ok and res ~= nil)
                 end
 
                 local show = opt.Enabled and alive and onScreen
@@ -293,16 +332,21 @@ end
 
 -- ── API publique ──────────────────────────────────────
 function ESP.Enable()
-    if renderConn then return end
     opt.Enabled = true
-    renderConn = RunService.RenderStepped:Connect(ESP._render)
+    if not renderConn then
+        renderConn = RunService.RenderStepped:Connect(ESP._render)
+    end
 end
 
 function ESP.Disable()
     opt.Enabled = false
-    if renderConn then renderConn:Disconnect(); renderConn = nil end
     for _, d in pairs(playerData) do
         ESP._hidePlayerDrawings(d)
+    end
+    -- Garde le renderConn si FOV circle actif
+    if not opt.FOVCircle and renderConn then
+        renderConn:Disconnect()
+        renderConn = nil
     end
 end
 
@@ -316,6 +360,15 @@ function ESP.IsEnabled() return opt.Enabled end
 
 function ESP.SetOption(key, value)
     opt[key] = value
+    -- FOV circle : démarre/arrête le render si nécessaire
+    if key == "FOVCircle" then
+        if value and not renderConn then
+            renderConn = RunService.RenderStepped:Connect(ESP._render)
+        elseif not value and not opt.Enabled and renderConn then
+            renderConn:Disconnect()
+            renderConn = nil
+        end
+    end
 end
 
 function ESP.GetOption(key)
