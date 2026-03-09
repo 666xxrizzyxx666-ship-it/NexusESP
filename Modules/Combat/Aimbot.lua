@@ -1,121 +1,112 @@
--- ══════════════════════════════════════════════════════
---   NexusESP v3.0.0 — Modules/Combat/Aimbot.lua
---   📁 Dossier : Modules/Combat/
---   Rôle : Aimbot smooth + snap + rage
---          AI-assisted targeting
--- ══════════════════════════════════════════════════════
-
+-- Aurora — Modules/Combat/Aimbot.lua v2.0
 local Aimbot = {}
 
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Camera         = workspace.CurrentCamera
-local LP             = Players.LocalPlayer
+local Camera           = workspace.CurrentCamera
+local LP               = Players.LocalPlayer
 
-local Utils    = nil
-local Config   = nil
-
-local enabled  = false
-local target   = nil
+local Utils  = nil
+local enabled   = false
 local renderConn = nil
 
-local FOVCircle = nil
+-- ── State interne ─────────────────────────────────────
+local opt = {
+    Smoothness = 10,
+    FOV        = 120,
+    Prediction = 0,
+    Bone       = "Head",
+    TeamCheck  = true,
+    WallCheck  = false,
+    HoldKey    = true,  -- maintenir clic droit
+}
 
--- ── FOV Circle (64 segments) ──────────────────────────
-local fovLines = {}
-local FOV_SEGMENTS = 64
+-- ── FOV Circle (64 segments, jamais auto-visible) ─────
+local fovLines    = {}
+local fovVisible  = false
+local FOV_SEG     = 64
 
-local function createFOVCircle()
-    for i = 1, FOV_SEGMENTS do
+local function buildFOVCircle()
+    for i = 1, FOV_SEG do
         local l = Drawing.new("Line")
         l.Visible   = false
         l.Thickness = 1
         l.ZIndex    = 5
         l.Outline   = false
+        l.Color     = Color3.fromRGB(255, 255, 255)
         fovLines[i] = l
     end
 end
 
-local function updateFOVCircle(cfg)
-    if not cfg or not cfg.ShowFOV then
-        for i = 1, FOV_SEGMENTS do
+local function renderFOVCircle()
+    if not fovVisible then
+        for i = 1, FOV_SEG do
             if fovLines[i] then fovLines[i].Visible = false end
         end
         return
     end
-
-    local cx     = Camera.ViewportSize.X / 2
-    local cy     = Camera.ViewportSize.Y / 2
-    local radius = cfg.FOV or 100
-    local color  = Color3.fromRGB(255,255,255)
-
-    for i = 1, FOV_SEGMENTS do
-        local a1 = (i - 1) / FOV_SEGMENTS * math.pi * 2
-        local a2 = i       / FOV_SEGMENTS * math.pi * 2
+    local cx = Camera.ViewportSize.X / 2
+    local cy = Camera.ViewportSize.Y / 2
+    local r  = opt.FOV
+    for i = 1, FOV_SEG do
+        local a1 = (i-1)/FOV_SEG * math.pi*2
+        local a2 = i    /FOV_SEG * math.pi*2
         local l  = fovLines[i]
-        l.From      = Vector2.new(cx + math.cos(a1) * radius, cy + math.sin(a1) * radius)
-        l.To        = Vector2.new(cx + math.cos(a2) * radius, cy + math.sin(a2) * radius)
-        l.Color     = color
-        l.Thickness = 1
-        l.Visible   = true
+        l.From    = Vector2.new(cx + math.cos(a1)*r, cy + math.sin(a1)*r)
+        l.To      = Vector2.new(cx + math.cos(a2)*r, cy + math.sin(a2)*r)
+        l.Visible = true
     end
 end
 
--- ── Trouver la meilleure cible ────────────────────────
-local function getBestTarget(cfg)
-    local bestTarget  = nil
-    local bestScore   = math.huge
-    local fov         = cfg.FOV or 100
-    local priority    = cfg.Priority or "Closest"
-    local boneTarget  = cfg.Bone    or "Head"
+-- ── Meilleure cible ───────────────────────────────────
+local function getCenter()
+    return Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+end
+
+local function getScreenPos(pos)
+    local sp, onScreen = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(sp.X, sp.Y), onScreen
+end
+
+local function getBestTarget()
+    local best, bestDist = nil, math.huge
+    local center = getCenter()
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player == LP then end -- skip, pas de continue
         if player ~= LP then
             local char = player.Character
             if char then
-                local hum  = char:FindFirstChildOfClass("Humanoid")
-                local root = char:FindFirstChild("HumanoidRootPart")
-
-                if hum and hum.Health > 0 and root then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
                     -- Team check
-                    local sameTeam = Utils and Utils.IsSameTeam(player) or false
-                    if not (cfg.TeamCheck and sameTeam) then
-
-                        local bone = char:FindFirstChild(boneTarget)
+                    local sameTeam = opt.TeamCheck
+                        and LP.Team ~= nil
+                        and player.Team ~= nil
+                        and LP.Team == player.Team
+                    if not sameTeam then
+                        local bone = char:FindFirstChild(opt.Bone)
                             or char:FindFirstChild("HumanoidRootPart")
-
                         if bone then
                             -- Wall check
-                            local visible = true
-                            if cfg.WallCheck then
-                                visible = Utils and Utils.IsVisible(bone) or true
+                            local pass = true
+                            if opt.WallCheck then
+                                local origin = Camera.CFrame.Position
+                                local dir    = (bone.Position - origin).Unit
+                                local ray    = Ray.new(origin, dir * 1000)
+                                local hit    = workspace:FindPartOnRayWithIgnoreList(
+                                    ray, {LP.Character, char}
+                                )
+                                pass = hit == nil
                             end
 
-                            if visible then
-                                local angle = Utils and Utils.GetAngleFromCenter(bone.Position) or 9999
-
-                                if angle <= fov then
-                                    local score
-
-                                    if priority == "Closest" then
-                                        score = angle
-                                    elseif priority == "LowestHP" then
-                                        score = hum.Health
-                                    elseif priority == "MostVisible" then
-                                        score = angle * 0.5
-                                    else
-                                        score = angle
-                                    end
-
-                                    if score < bestScore then
-                                        bestScore  = score
-                                        bestTarget = {
-                                            player = player,
-                                            char   = char,
-                                            bone   = bone,
-                                        }
+                            if pass then
+                                local sp, onScreen = getScreenPos(bone.Position)
+                                if onScreen then
+                                    local dist = (sp - center).Magnitude
+                                    if dist <= opt.FOV and dist < bestDist then
+                                        bestDist = dist
+                                        best     = {player=player, char=char, bone=bone}
                                     end
                                 end
                             end
@@ -125,122 +116,79 @@ local function getBestTarget(cfg)
             end
         end
     end
-
-    return bestTarget
-end
-
--- ── Humanizer ─────────────────────────────────────────
-local function humanize(smoothness, mode)
-    local base = smoothness or 10
-    if mode == "Rage" then return 0 end
-    if mode == "Lite" then
-        base = base * 1.5
-        base = base + math.random(-3, 3)
-    else
-        base = base + math.random(-1, 1)
-    end
-    return math.max(1, base)
+    return best
 end
 
 -- ── Viser ─────────────────────────────────────────────
-local function aimAt(position, cfg)
-    local mode       = cfg.Mode       or "Normal"
-    local smoothness = cfg.Smoothness or 10
-
-    local camCF  = Camera.CFrame
-    local targetCF = CFrame.new(camCF.Position, position)
-
-    if mode == "Rage" then
-        Camera.CFrame = targetCF
-    else
-        local smooth = humanize(smoothness, mode)
-        local newCF  = camCF:Lerp(targetCF, 1 / smooth)
-        Camera.CFrame = newCF
-    end
+local function aimAt(pos)
+    local camCF    = Camera.CFrame
+    local targetCF = CFrame.new(camCF.Position, pos)
+    local smooth   = math.max(1, opt.Smoothness)
+    Camera.CFrame  = camCF:Lerp(targetCF, 1 / smooth)
 end
 
--- ── Render loop ───────────────────────────────────────
+-- ── Render ────────────────────────────────────────────
 local function onRender()
-    local cfg = Config and Config.Current and Config.Current.Aimbot
-    if not cfg then return end
-
-    updateFOVCircle(cfg)
-
+    renderFOVCircle()
     if not enabled then return end
 
-    -- Vérifie si le bouton est maintenu
-    local holding = false
-    if cfg.HoldKey then
-        holding = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    else
-        holding = true
-    end
+    local holding = opt.HoldKey
+        and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        or not opt.HoldKey
 
-    if not holding then
-        target = nil
-        return
-    end
+    if not holding then return end
 
-    -- Trouve la cible
-    target = getBestTarget(cfg)
+    local t = getBestTarget()
+    if not t then return end
 
-    if target then
-        local bone = target.bone
-        if bone then
-            local pos = bone.Position
-
-            -- Prédiction
-            if cfg.Prediction and cfg.Prediction > 0 then
-                local vel   = bone.AssemblyLinearVelocity
-                local ping  = Utils and Utils.GetPing() or 50
-                pos = pos + vel * (ping / 1000) * (cfg.Prediction / 50)
-            end
-
-            aimAt(pos, cfg)
+    local pos = t.bone.Position
+    -- Prédiction
+    if opt.Prediction > 0 then
+        local ok, vel = pcall(function()
+            return t.bone.AssemblyLinearVelocity
+        end)
+        if ok and vel then
+            local ping = LP:GetNetworkPing() * 1000
+            pos = pos + vel * (ping/1000) * (opt.Prediction/50)
         end
     end
+
+    aimAt(pos)
 end
 
--- ── Init ──────────────────────────────────────────────
+-- ── API ───────────────────────────────────────────────
 function Aimbot.Init(deps)
-    Utils  = deps.Utils  or Utils
-    Config = deps.Config or Config
-
-    createFOVCircle()
-
-    renderConn = RunService.RenderStepped:Connect(onRender)
-    print("[Aimbot] Initialisé ✓")
+    Utils = deps and deps.Utils or Utils
+    buildFOVCircle()
+    -- PAS de renderConn ici — seulement quand activé
 end
 
 function Aimbot.Enable()
-    enabled = true
+    if renderConn then return end
+    enabled    = true
+    renderConn = RunService.RenderStepped:Connect(onRender)
 end
 
 function Aimbot.Disable()
     enabled = false
-    target  = nil
-    for i = 1, FOV_SEGMENTS do
-        if fovLines[i] then fovLines[i].Visible = false end
+    if renderConn then renderConn:Disconnect(); renderConn = nil end
+    -- Cache le FOV circle
+    fovVisible = false
+    renderFOVCircle()
+end
+
+function Aimbot.SetOption(key, value)
+    opt[key] = value
+end
+
+function Aimbot.ShowFOV(v)
+    fovVisible = v
+    if not renderConn then
+        -- Lance juste le FOV circle sans l'aimbot
+        renderConn = RunService.RenderStepped:Connect(onRender)
     end
-end
-
-function Aimbot.Toggle()
-    if enabled then Aimbot.Disable() else Aimbot.Enable() end
-end
-
-function Aimbot.IsEnabled()
-    return enabled
-end
-
-function Aimbot.GetTarget()
-    return target
-end
-
-function Aimbot.Destroy()
-    Aimbot.Disable()
-    if renderConn then renderConn:Disconnect() end
-    for i = 1, FOV_SEGMENTS do
-        if fovLines[i] then pcall(function() fovLines[i]:Remove() end) end
+    if not v and not enabled then
+        if renderConn then renderConn:Disconnect(); renderConn = nil end
     end
 end
 
