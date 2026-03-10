@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.10.2"
+local VERSION = "5.11.1"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -28,10 +28,11 @@ local opt = {
     TeamColor   = Color3.fromRGB(60, 255, 120),
     MaxDist     = 500,
     Distance    = false,
+    Weapon      = false,
 }
 
 local function anyEnabled()
-    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health or opt.Distance
+    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health or opt.Distance or opt.Weapon
 end
 
 local function getColor(player)
@@ -85,7 +86,7 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), dist=newText() }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), dist=newText(), weap=newText() }
 end
 
 local function hideDrawings(d)
@@ -96,6 +97,7 @@ local function hideDrawings(d)
     d.tr.Visible=false d.name.Visible=false
     d.hbar.Visible=false
     if d.dist then d.dist.Visible=false end
+    if d.weap then d.weap.Visible=false end
 end
 
 local function removeDrawings(d)
@@ -107,6 +109,7 @@ local function removeDrawings(d)
     pcall(function() d.name:Remove() end)
     pcall(function() d.hbar:Remove() end)
     pcall(function() d.dist:Remove() end)
+    pcall(function() d.weap:Remove() end)
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -206,6 +209,17 @@ local function drawHealth(d, bb, hum)
     d.hbar.Visible   = true
 end
 
+local function drawWeapon(weapD, char, bb, col)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then weapD.Visible=false return end
+    local yOffset = opt.Distance and 18 or 0
+    weapD.Text     = "[" .. tool.Name .. "]"
+    weapD.Size     = 11
+    weapD.Color    = col
+    weapD.Position = Vector2.new(bb.cx, bb.y + bb.height + 3 + yOffset)
+    weapD.Visible  = true
+end
+
 local function drawDistance(distD, bb, dist)
     distD.Text     = dist .. "m"
     distD.Size     = 15
@@ -261,9 +275,12 @@ local function renderPlayer(player, d)
 
     if opt.Distance and bb then drawDistance(d.dist, bb, dist)
     else d.dist.Visible=false end
+
+    if opt.Weapon and bb then drawWeapon(d.weap, char, bb, col)
+    else d.weap.Visible=false end
 end
 
-RunService.RenderStepped:Connect(function()
+RunService:BindToRenderStep("AuroraESP", Enum.RenderPriority.Camera.Value + 1, function()
     if not anyEnabled() then return end
     for player, d in pairs(playerData) do
         if not player or not player.Parent then
@@ -349,6 +366,10 @@ end
 Tab:AddToggle("ESPDistance", {
     Title="Distance", Default=false,
     Callback=function(v) opt.Distance=v end,
+})
+Tab:AddToggle("ESPWeapon", {
+    Title="Weapon", Default=false,
+    Callback=function(v) opt.Weapon=v end,
 })
 Tab:AddColorpicker("ESPEnemyColor", {
     Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
