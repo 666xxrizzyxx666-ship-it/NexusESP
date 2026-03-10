@@ -2,7 +2,7 @@
 --   Aurora v5.2.0 — Main.lua — TOUT EN UN FICHIER
 --   Push UNIQUEMENT ce fichier sur GitHub, rien d'autre
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.2.1"
+local VERSION = "5.3.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -20,6 +20,7 @@ local opt = {
     TeamCheck = false,
     WallCheck = false,
     MaxDist   = 500,
+    Skeleton  = false,
 }
 
 local playerData = {}
@@ -34,6 +35,22 @@ local function newLine()
     l.ZIndex       = 2
     return l
 end
+
+-- Bones R15 + R6
+local BONES_R15 = {
+    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+    {"LowerTorso","LeftUpperLeg"},{"LowerTorso","RightUpperLeg"},
+    {"LeftUpperLeg","LeftLowerLeg"},{"RightUpperLeg","RightLowerLeg"},
+    {"LeftLowerLeg","LeftFoot"},{"RightLowerLeg","RightFoot"},
+    {"UpperTorso","LeftUpperArm"},{"UpperTorso","RightUpperArm"},
+    {"LeftUpperArm","LeftLowerArm"},{"RightUpperArm","RightLowerArm"},
+    {"LeftLowerArm","LeftHand"},{"RightLowerArm","RightHand"},
+}
+local BONES_R6 = {
+    {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},
+    {"Torso","Left Leg"},{"Torso","Right Leg"},
+}
+local MAX_BONES = #BONES_R15
 
 -- Bounding box
 local function getBB(char)
@@ -54,7 +71,8 @@ end
 local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
-    return { box=box, cor=cor }
+    local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
+    return { box=box, cor=cor, sk=sk }
 end
 
 -- Supprimer drawings
@@ -62,6 +80,7 @@ local function removeDrawings(d)
     if not d then return end
     for i=1,4 do pcall(function() d.box[i]:Remove() end) end
     for i=1,8 do pcall(function() d.cor[i]:Remove() end) end
+    if d.sk then for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end end
 end
 
 -- Cacher drawings
@@ -69,6 +88,7 @@ local function hideDrawings(d)
     if not d then return end
     for i=1,4 do d.box[i].Visible = false end
     for i=1,8 do d.cor[i].Visible = false end
+    if d.sk then for i=1,MAX_BONES do d.sk[i].Visible = false end end
 end
 
 -- Box 2D normale
@@ -106,6 +126,37 @@ local function drawCorner(d, bb, col)
     for i=1,4 do d.box[i].Visible = false end
 end
 
+-- Draw skeleton
+local function drawSkeleton(sk, char)
+    local isR15 = char:FindFirstChild("UpperTorso") ~= nil
+    local bones = isR15 and BONES_R15 or BONES_R6
+    for i = 1, MAX_BONES do
+        local line = sk[i]
+        local bone = bones[i]
+        if bone then
+            local pA = char:FindFirstChild(bone[1])
+            local pB = char:FindFirstChild(bone[2])
+            if pA and pB then
+                local sA = Camera:WorldToViewportPoint(pA.Position)
+                local sB = Camera:WorldToViewportPoint(pB.Position)
+                if sA.Z > 0 and sB.Z > 0 then
+                    line.From      = Vector2.new(sA.X, sA.Y)
+                    line.To        = Vector2.new(sB.X, sB.Y)
+                    line.Color     = Color3.new(1,1,1)
+                    line.Thickness = 1
+                    line.Visible   = true
+                else
+                    line.Visible = false
+                end
+            else
+                line.Visible = false
+            end
+        else
+            line.Visible = false
+        end
+    end
+end
+
 -- Render un joueur
 local function renderPlayer(player, d)
     local char = player.Character
@@ -131,7 +182,15 @@ local function renderPlayer(player, d)
             drawBox(d, bb, opt.BoxColor)
         end
     else
-        hideDrawings(d)
+        for i=1,4 do d.box[i].Visible = false end
+        for i=1,8 do d.cor[i].Visible = false end
+    end
+
+    -- Skeleton
+    if opt.Skeleton and d.sk then
+        drawSkeleton(d.sk, char)
+    else
+        if d.sk then for i=1,MAX_BONES do d.sk[i].Visible = false end end
     end
 end
 
@@ -171,6 +230,7 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ══════════════════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════════════════
 -- UI FLUENT
 -- ══════════════════════════════════════════════════════════════════
 local Fluent = loadstring(game:HttpGet(
@@ -188,14 +248,11 @@ local Window = Fluent:CreateWindow({
 
 local Tab = Window:AddTab({ Title="ESP", Icon="eye" })
 
-Tab:AddSection("Boxes")
-
 Tab:AddToggle("ESPEnabled", {
-    Title    = "👁  ESP Global",
+    Title    = "ESP",
     Default  = false,
     Callback = function(v)
         opt.Enabled = v
-        -- Si on désactive, on cache tout
         if not v then
             for _, d in pairs(playerData) do hideDrawings(d) end
         end
@@ -203,40 +260,23 @@ Tab:AddToggle("ESPEnabled", {
 })
 
 Tab:AddToggle("ESPBox", {
-    Title    = "🟩 Box ESP",
+    Title    = "Box",
     Default  = false,
     Callback = function(v) opt.Box = v end,
 })
 
 Tab:AddDropdown("ESPBoxStyle", {
-    Title    = "Style",
+    Title    = "Style Box",
     Default  = "2D Normal",
     Values   = {"2D Normal", "Corner Box"},
     Callback = function(v) opt.BoxStyle = v end,
 })
 
-Tab:AddSection("Filtres")
-
-Tab:AddToggle("ESPTeam", {
-    Title    = "👥 Team Check",
+Tab:AddToggle("ESPSkeleton", {
+    Title    = "Skeleton",
     Default  = false,
-    Callback = function(v) opt.TeamCheck = v end,
-})
-
-Tab:AddSlider("ESPDist", {
-    Title    = "Distance max",
-    Default  = 500,
-    Min      = 50,
-    Max      = 2000,
-    Rounding = 0,
-    Callback = function(v) opt.MaxDist = v end,
-})
-
-Tab:AddSection("Info")
-Tab:AddParagraph({
-    Title   = "Comment tester",
-    Content = "1. Active ESP Global\n2. Active Box ESP\n3. Tu dois voir des rectangles autour des joueurs",
+    Callback = function(v) opt.Skeleton = v end,
 })
 
 Window:SelectTab(1)
-print("[Aurora v"..VERSION.."] Chargé — Push Main.lua UNIQUEMENT")
+print("[Aurora v"..VERSION.."] Chargé")
