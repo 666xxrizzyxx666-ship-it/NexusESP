@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.13.0"
+local VERSION = "5.13.1"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -104,6 +104,7 @@ local function hideDrawings(d)
     d.hbar.Visible=false
     if d.dist then d.dist.Visible=false end
     if d.weap then d.weap.Visible=false end
+    if d.highlight then d.highlight.Enabled=false end
 end
 
 local function removeDrawings(d)
@@ -116,7 +117,7 @@ local function removeDrawings(d)
     pcall(function() d.hbar:Remove() end)
     pcall(function() d.dist:Remove() end)
     pcall(function() d.weap:Remove() end)
-    if d.highlight then pcall(function() d.highlight:Destroy() end) d.highlight=nil end
+    if d.highlight then d.highlight.Enabled=false end
 end
 
 -- ══════════════════════════════════════════════════════════════════
