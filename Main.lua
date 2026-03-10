@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "6.0.2"
+local VERSION = "6.0.1"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -469,7 +469,7 @@ local aimbotOpt = {
     Smoothness = 10,
     Bone       = "Head",
     TeamCheck  = true,
-    AimKey     = Enum.UserInputType.MouseButton2,
+    HoldKey    = true,
 }
 
 -- FOV Circle (64 segments)
@@ -543,15 +543,9 @@ RunService:BindToRenderStep("AuroraAimbot", Enum.RenderPriority.Camera.Value + 2
     renderFOV()
     if not aimbotOpt.Enabled then return end
 
-    local key     = aimbotOpt.AimKey
-    local holding = false
-    if typeof(key) == "EnumItem" then
-        if key.EnumType == Enum.UserInputType then
-            holding = UIS:IsMouseButtonPressed(key)
-        elseif key.EnumType == Enum.KeyCode then
-            holding = UIS:IsKeyDown(key)
-        end
-    end
+    local holding = aimbotOpt.HoldKey
+        and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        or not aimbotOpt.HoldKey
 
     if not holding then return end
 
@@ -571,14 +565,9 @@ TabAim:AddToggle("AimEnabled", {
     Title="Aimbot", Default=false,
     Callback=function(v) aimbotOpt.Enabled=v end,
 })
-TabAim:AddKeybind("AimKey", {
-    Title="Touche pour viser",
-    Default=Enum.UserInputType.MouseButton2,
-    Callback=function(v) aimbotOpt.AimKey=v end,
-})
 TabAim:AddParagraph({
-    Title   = "ℹ Touche par défaut",
-    Content = "Clic droit (MouseButton2) recommandé pour viser. Change la touche selon ta préférence.",
+    Title   = "ℹ Touche de visée",
+    Content = "Touche par défaut : Hold Clic Droit. Le choix de touche sera disponible dans l'UI finale.",
 })
 TabAim:AddSlider("AimFOV", {
     Title="FOV", Default=120, Min=10, Max=500, Rounding=0,
