@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.11.2"
+local VERSION = "5.11.3"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -210,15 +210,20 @@ local function drawHealth(d, bb, hum)
 end
 
 local function drawWeapon(weapD, player, char, bb, col)
-    -- cherche tool dans character (arme équipée) ou backpack
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then
-        local bp = player:FindFirstChild("Backpack")
-        if bp then tool = bp:FindFirstChildOfClass("Tool") end
+    local weapName = nil
+    -- Arsenal : StringValue "EquippedWep" dans le character
+    local equippedWep = char:FindFirstChild("EquippedWep")
+    if equippedWep and equippedWep.Value ~= "" then
+        weapName = equippedWep.Value
     end
-    if not tool then weapD.Visible=false return end
+    -- Fallback générique : Tool classique
+    if not weapName then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then weapName = tool.Name end
+    end
+    if not weapName or weapName == "" then weapD.Visible=false return end
     local yOffset = opt.Distance and 18 or 0
-    weapD.Text     = "[" .. tool.Name .. "]"
+    weapD.Text     = "[" .. weapName .. "]"
     weapD.Size     = 11
     weapD.Color    = col
     weapD.Position = Vector2.new(bb.cx, bb.y + bb.height + 3 + yOffset)
