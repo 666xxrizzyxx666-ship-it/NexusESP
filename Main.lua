@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.8.0"
+local VERSION = "5.9.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -79,7 +79,7 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), hp=100, maxHp=100 }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine() }
 end
 
 local function hideDrawings(d)
@@ -181,8 +181,12 @@ local function getHPColor(pct)
     else return Color3.fromRGB(248, 113, 113) end
 end
 
-local function drawHealth(d, bb)
-    local pct  = math.clamp(d.hp / d.maxHp, 0, 1)
+local function drawHealth(d, bb, hum)
+    local maxHp = hum.MaxHealth
+    local hp    = hum.Health
+    if maxHp <= 0 then maxHp = 100 end
+    if hp    <= 0 then hp    = 0   end
+    local pct  = hp / maxHp
     local col  = getHPColor(pct)
     local x    = bb.x - 4
     local yBot = bb.y + bb.height
@@ -236,7 +240,7 @@ local function renderPlayer(player, d)
     if opt.Name and bb then drawName(d.name, player, bb, col)
     else d.name.Visible=false end
 
-    if opt.Health and bb then drawHealth(d, bb)
+    if opt.Health and bb then drawHealth(d, bb, hum)
     else d.hbar.Visible=false end
 end
 
@@ -254,31 +258,10 @@ end)
 -- ══════════════════════════════════════════════════════════════════
 -- GESTION JOUEURS
 -- ══════════════════════════════════════════════════════════════════
-local function setupHP(p)
-    local d = playerData[p]
-    if not d then return end
-    task.spawn(function()
-        local char = p.Character or p.CharacterAdded:Wait()
-        local hum  = char:WaitForChild("Humanoid", 5)
-        if not hum then return end
-        -- lecture initiale — player peut être full HP donc HealthChanged jamais fire
-        d.maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
-        d.hp    = hum.Health > 0 and hum.Health or d.maxHp
-        -- update en temps réel
-        hum.HealthChanged:Connect(function(newHp)
-            if playerData[p] then
-                playerData[p].hp    = newHp
-                playerData[p].maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
-            end
-        end)
-    end)
-end
-
 local function addPlayer(p)
     if playerData[p] then return end
     playerData[p] = createDrawings()
-    setupHP(p)
-    p.CharacterAdded:Connect(function() setupHP(p) end)
+
     p.CharacterRemoving:Connect(function()
         if playerData[p] then hideDrawings(playerData[p]) end
     end)
