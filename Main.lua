@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.11.1"
+local VERSION = "5.11.2"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -209,8 +209,13 @@ local function drawHealth(d, bb, hum)
     d.hbar.Visible   = true
 end
 
-local function drawWeapon(weapD, char, bb, col)
+local function drawWeapon(weapD, player, char, bb, col)
+    -- cherche tool dans character (arme équipée) ou backpack
     local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then
+        local bp = player:FindFirstChild("Backpack")
+        if bp then tool = bp:FindFirstChildOfClass("Tool") end
+    end
     if not tool then weapD.Visible=false return end
     local yOffset = opt.Distance and 18 or 0
     weapD.Text     = "[" .. tool.Name .. "]"
@@ -220,10 +225,10 @@ local function drawWeapon(weapD, char, bb, col)
     weapD.Visible  = true
 end
 
-local function drawDistance(distD, bb, dist)
+local function drawDistance(distD, bb, dist, col)
     distD.Text     = dist .. "m"
     distD.Size     = 15
-    distD.Color    = Color3.fromRGB(200, 200, 200)
+    distD.Color    = col
     distD.Position = Vector2.new(bb.cx, bb.y + bb.height + 3)
     distD.Visible  = true
 end
@@ -273,10 +278,10 @@ local function renderPlayer(player, d)
     if opt.Health and bb then drawHealth(d, bb, hum)
     else d.hbar.Visible=false end
 
-    if opt.Distance and bb then drawDistance(d.dist, bb, dist)
+    if opt.Distance and bb then drawDistance(d.dist, bb, dist, col)
     else d.dist.Visible=false end
 
-    if opt.Weapon and bb then drawWeapon(d.weap, char, bb, col)
+    if opt.Weapon and bb then drawWeapon(d.weap, player, char, bb, col)
     else d.weap.Visible=false end
 end
 
