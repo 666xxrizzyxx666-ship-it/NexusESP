@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.6.3"
+local VERSION = "5.7.1"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -81,7 +81,7 @@ local function createDrawings()
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
     local hbg  = newLine()
     local hbar = newLine()
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbg=hbg, hbar=hbar }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbg=hbg, hbar=hbar, hp=100, maxHp=100 }
 end
 
 local function hideDrawings(d)
@@ -184,24 +184,23 @@ local function getHPColor(pct)
     else return Color3.fromRGB(248, 113, 113) end
 end
 
-local function drawHealth(d, bb, hum)
-    local maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
-    local pct   = math.clamp(hum.Health / maxHp, 0, 1)
+local function drawHealth(d, bb)
+    -- hp/maxHp sont mis à jour par HealthChanged event, pas lu chaque frame
+    local pct   = math.clamp(d.hp / d.maxHp, 0, 1)
     local col   = getHPColor(pct)
+    local x     = bb.x - 5
     local yTop  = bb.y
     local yBot  = bb.y + bb.height
-    local xBg   = bb.x - 5   -- bg position
-    local xBar  = bb.x - 5   -- bar même position mais plus fine = visible à l'intérieur
-    -- bg : épais (5px) → gris foncé, dessiné en premier
-    d.hbg.From      = Vector2.new(xBg, yTop)
-    d.hbg.To        = Vector2.new(xBg, yBot)
+    -- bg gris (5px)
+    d.hbg.From      = Vector2.new(x, yTop)
+    d.hbg.To        = Vector2.new(x, yBot)
     d.hbg.Color     = Color3.fromRGB(30, 30, 30)
     d.hbg.Thickness = 5
     d.hbg.Visible   = true
-    -- bar : fine (3px) → colorée, dessinée après = au dessus du bg
+    -- barre colorée (3px) = toujours visible à l'intérieur du bg
     local fillY = yBot - (bb.height * pct)
-    d.hbar.From      = Vector2.new(xBar, yBot)
-    d.hbar.To        = Vector2.new(xBar, fillY)
+    d.hbar.From      = Vector2.new(x, yBot)
+    d.hbar.To        = Vector2.new(x, fillY)
     d.hbar.Color     = col
     d.hbar.Thickness = 3
     d.hbar.Visible   = true
@@ -249,7 +248,7 @@ local function renderPlayer(player, d)
     if opt.Name and bb then drawName(d.name, player, bb, col)
     else d.name.Visible=false end
 
-    if opt.Health and bb then drawHealth(d, bb, hum)
+    if opt.Health and bb then drawHealth(d, bb)
     else d.hbg.Visible=false d.hbar.Visible=false end
 end
 
@@ -267,9 +266,31 @@ end)
 -- ══════════════════════════════════════════════════════════════════
 -- GESTION JOUEURS
 -- ══════════════════════════════════════════════════════════════════
+local function setupHP(p)
+    local d = playerData[p]
+    if not d then return end
+    task.spawn(function()
+        local char = p.Character or p.CharacterAdded:Wait()
+        local hum  = char:WaitForChild("Humanoid", 5)
+        if not hum then return end
+        -- lecture initiale — player peut être full HP donc HealthChanged jamais fire
+        d.maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
+        d.hp    = hum.Health > 0 and hum.Health or d.maxHp
+        -- update en temps réel
+        hum.HealthChanged:Connect(function(newHp)
+            if playerData[p] then
+                playerData[p].hp    = newHp
+                playerData[p].maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
+            end
+        end)
+    end)
+end
+
 local function addPlayer(p)
     if playerData[p] then return end
     playerData[p] = createDrawings()
+    setupHP(p)
+    p.CharacterAdded:Connect(function() setupHP(p) end)
     p.CharacterRemoving:Connect(function()
         if playerData[p] then hideDrawings(playerData[p]) end
     end)
