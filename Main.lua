@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.5.0"
+local VERSION = "5.6.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,13 +17,15 @@ local opt = {
     Skeleton    = false,
     Tracers     = false,
     Name        = false,
+    TracerOrigin = "Bottom",
+    Health      = false,
     EnemyColor  = Color3.fromRGB(255, 60, 60),
     TeamColor   = Color3.fromRGB(60, 255, 120),
     MaxDist     = 500,
 }
 
 local function anyEnabled()
-    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name
+    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health
 end
 
 local function getColor(player)
@@ -77,7 +79,9 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText() }
+    local hbg  = newLine()
+    local hbar = newLine()
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbg=hbg, hbar=hbar }
 end
 
 local function hideDrawings(d)
@@ -86,6 +90,7 @@ local function hideDrawings(d)
     for i=1,8 do d.cor[i].Visible=false end
     for i=1,MAX_BONES do d.sk[i].Visible=false end
     d.tr.Visible=false d.name.Visible=false
+    d.hbg.Visible=false d.hbar.Visible=false
 end
 
 local function removeDrawings(d)
@@ -95,6 +100,8 @@ local function removeDrawings(d)
     for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end
     pcall(function() d.tr:Remove() end)
     pcall(function() d.name:Remove() end)
+    pcall(function() d.hbg:Remove() end)
+    pcall(function() d.hbar:Remove() end)
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -165,8 +172,29 @@ end
 
 local function drawTracer(tr, bb, col)
     local vp = Camera.ViewportSize
-    tr.From=Vector2.new(vp.X/2, vp.Y) tr.To=Vector2.new(bb.cx, bb.botY)
+    local fromY = opt.TracerOrigin == "Top" and 0 or vp.Y
+    local toY   = opt.TracerOrigin == "Top" and bb.y or bb.botY
+    tr.From=Vector2.new(vp.X/2, fromY) tr.To=Vector2.new(bb.cx, toY)
     tr.Color=col tr.Thickness=1 tr.Visible=true
+end
+
+local function getHPColor(pct)
+    if pct > 0.6 then return Color3.fromRGB(74, 222, 128)
+    elseif pct > 0.3 then return Color3.fromRGB(251, 191, 36)
+    else return Color3.fromRGB(248, 113, 113) end
+end
+
+local function drawHealth(d, bb, hum)
+    local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+    local col = getHPColor(pct)
+    local x, y, h = bb.x - 6, bb.y, bb.height
+    -- bg
+    d.hbg.From=Vector2.new(x, y) d.hbg.To=Vector2.new(x, y+h)
+    d.hbg.Color=Color3.fromRGB(20,20,20) d.hbg.Thickness=4 d.hbg.Visible=true
+    -- bar (remplit de bas en haut)
+    local fillH = h * pct
+    d.hbar.From=Vector2.new(x, y+h) d.hbar.To=Vector2.new(x, y+h-fillH)
+    d.hbar.Color=col d.hbar.Thickness=4 d.hbar.Visible=true
 end
 
 local function drawName(nameD, player, bb, col)
@@ -210,6 +238,9 @@ local function renderPlayer(player, d)
 
     if opt.Name and bb then drawName(d.name, player, bb, col)
     else d.name.Visible=false end
+
+    if opt.Health and bb then drawHealth(d, bb, hum)
+    else d.hbg.Visible=false d.hbar.Visible=false end
 end
 
 RunService.RenderStepped:Connect(function()
@@ -276,9 +307,17 @@ Tab:AddToggle("ESPTracers", {
     Title="Tracers", Default=false,
     Callback=function(v) opt.Tracers=v end,
 })
+Tab:AddDropdown("ESPTracerOrigin", {
+    Title="Origine Tracers", Default="Bottom", Values={"Bottom","Top"},
+    Callback=function(v) opt.TracerOrigin=v end,
+})
 Tab:AddToggle("ESPName", {
     Title="Name", Default=false,
     Callback=function(v) opt.Name=v end,
+})
+Tab:AddToggle("ESPHealth", {
+    Title="Health Bar", Default=false,
+    Callback=function(v) opt.Health=v end,
 })
 Tab:AddColorpicker("ESPEnemyColor", {
     Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
