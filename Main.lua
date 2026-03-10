@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.12.0"
+local VERSION = "5.13.0"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -31,6 +31,7 @@ local opt = {
     Weapon      = false,
     Chams       = false,
     ChamsStyle  = "Outline",
+    TeamCheck   = false,
 }
 
 local function anyEnabled()
@@ -38,6 +39,9 @@ local function anyEnabled()
 end
 
 local function getColor(player)
+    if opt.TeamCheck and LP.Team and player.Team and LP.Team == player.Team then
+        return nil -- skip teammates
+    end
     if LP.Team and player.Team and LP.Team == player.Team then
         return opt.TeamColor
     end
@@ -296,6 +300,7 @@ local function renderPlayer(player, d)
     if dist > opt.MaxDist then hideDrawings(d) return end
 
     local col = getColor(player)
+    if not col then hideDrawings(d) return end
     local bb  = getBB(char)
 
     if opt.Box and bb then
@@ -422,6 +427,12 @@ Tab:AddToggle("ESPWeapon", {
     Title="Weapon", Default=false,
     Callback=function(v) opt.Weapon=v end,
 })
+if IS_ARSENAL then
+    Tab:AddParagraph({
+        Title   = "⚠ Weapon indisponible",
+        Content = "Arsenal ne réplique pas les armes des joueurs côté client. Cette option n'aura aucun effet sur ce jeu.",
+    })
+end
 Tab:AddToggle("ESPChams", {
     Title="Chams", Default=false,
     Callback=function(v) opt.Chams=v end,
@@ -429,6 +440,11 @@ Tab:AddToggle("ESPChams", {
 Tab:AddDropdown("ESPChamsStyle", {
     Title="Style Chams", Default="Outline", Values={"Outline","Filled"},
     Callback=function(v) opt.ChamsStyle=v end,
+})
+Tab:AddToggle("ESPTeamCheck", {
+    Title="Team Check (cache les coéquipiers)",
+    Default=false,
+    Callback=function(v) opt.TeamCheck=v end,
 })
 Tab:AddColorpicker("ESPEnemyColor", {
     Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
