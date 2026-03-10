@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.10.1"
+local VERSION = "5.10.2"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -208,7 +208,7 @@ end
 
 local function drawDistance(distD, bb, dist)
     distD.Text     = dist .. "m"
-    distD.Size     = 11
+    distD.Size     = 15
     distD.Color    = Color3.fromRGB(200, 200, 200)
     distD.Position = Vector2.new(bb.cx, bb.y + bb.height + 3)
     distD.Visible  = true
