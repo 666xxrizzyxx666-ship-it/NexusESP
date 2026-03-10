@@ -1,46 +1,174 @@
 -- ══════════════════════════════════════════════════════════════════
---   Aurora v5.1.1 — Main.lua
---   TEST : Box ESP uniquement — tout le reste désactivé
---   GitHub : 666xxrizzyxx666-ship-it/NexusESP
+--   Aurora v5.2.0 — Main.lua — TOUT EN UN FICHIER
+--   Push UNIQUEMENT ce fichier sur GitHub, rien d'autre
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.1.1"
-local REPO    = "https://raw.githubusercontent.com/666xxrizzyxx666-ship-it/NexusESP/refs/heads/main/"
+local VERSION = "5.2.1"
 
--- ── Services ──────────────────────────────────────────────────────
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UIS        = game:GetService("UserInputService")
 local LP         = Players.LocalPlayer
 local Camera     = workspace.CurrentCamera
 
--- ── Logs silencieux ───────────────────────────────────────────────
-local function _p(...) end
-local function _w(...) end
+-- ══════════════════════════════════════════════════════════════════
+-- ESP ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local opt = {
+    Enabled   = false,
+    Box       = false,
+    BoxStyle  = "2D Normal",
+    BoxColor  = Color3.fromRGB(255, 255, 255),
+    TeamCheck = false,
+    WallCheck = false,
+    MaxDist   = 500,
+}
 
--- ── Loader GitHub ─────────────────────────────────────────────────
-local function load(path)
-    local ok, result = pcall(function()
-        return loadstring(game:HttpGet(REPO..path, true))()
+local playerData = {}
+
+-- Drawing helpers
+local function newLine()
+    local l = Drawing.new("Line")
+    l.Visible      = false
+    l.Thickness    = 1
+    l.Color        = Color3.new(1,1,1)
+    l.Transparency = 1
+    l.ZIndex       = 2
+    return l
+end
+
+-- Bounding box
+local function getBB(char)
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local head = char:FindFirstChild("Head")
+    if not root or not head then return nil end
+    local hs = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, head.Size.Y/2, 0))
+    local fs = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+    if hs.Z <= 0 or fs.Z <= 0 then return nil end
+    local h = math.abs(hs.Y - fs.Y)
+    if h < 5 then return nil end
+    local w  = h * 0.55
+    local cx = (hs.X + fs.X) / 2
+    return { x=cx-w/2, y=hs.Y, width=w, height=h, cx=cx, botY=fs.Y }
+end
+
+-- Créer drawings pour un joueur
+local function createDrawings()
+    local box = {}; for i=1,4 do box[i] = newLine() end
+    local cor = {}; for i=1,8 do cor[i] = newLine() end
+    return { box=box, cor=cor }
+end
+
+-- Supprimer drawings
+local function removeDrawings(d)
+    if not d then return end
+    for i=1,4 do pcall(function() d.box[i]:Remove() end) end
+    for i=1,8 do pcall(function() d.cor[i]:Remove() end) end
+end
+
+-- Cacher drawings
+local function hideDrawings(d)
+    if not d then return end
+    for i=1,4 do d.box[i].Visible = false end
+    for i=1,8 do d.cor[i].Visible = false end
+end
+
+-- Box 2D normale
+local function drawBox(d, bb, col)
+    local x,y,w,h = bb.x, bb.y, bb.width, bb.height
+    d.box[1].From=Vector2.new(x,y)     d.box[1].To=Vector2.new(x+w,y)
+    d.box[2].From=Vector2.new(x,y+h)   d.box[2].To=Vector2.new(x+w,y+h)
+    d.box[3].From=Vector2.new(x,y)     d.box[3].To=Vector2.new(x,y+h)
+    d.box[4].From=Vector2.new(x+w,y)   d.box[4].To=Vector2.new(x+w,y+h)
+    for i=1,4 do
+        d.box[i].Color     = col
+        d.box[i].Thickness = 1
+        d.box[i].Visible   = true
+    end
+    for i=1,8 do d.cor[i].Visible = false end
+end
+
+-- Corner Box
+local function drawCorner(d, bb, col)
+    local x,y,w,h = bb.x, bb.y, bb.width, bb.height
+    local cw, ch = w*0.28, h*0.28
+    d.cor[1].From=Vector2.new(x,y)         d.cor[1].To=Vector2.new(x+cw,y)
+    d.cor[2].From=Vector2.new(x,y)         d.cor[2].To=Vector2.new(x,y+ch)
+    d.cor[3].From=Vector2.new(x+w-cw,y)   d.cor[3].To=Vector2.new(x+w,y)
+    d.cor[4].From=Vector2.new(x+w,y)       d.cor[4].To=Vector2.new(x+w,y+ch)
+    d.cor[5].From=Vector2.new(x,y+h-ch)   d.cor[5].To=Vector2.new(x,y+h)
+    d.cor[6].From=Vector2.new(x,y+h)       d.cor[6].To=Vector2.new(x+cw,y+h)
+    d.cor[7].From=Vector2.new(x+w,y+h-ch) d.cor[7].To=Vector2.new(x+w,y+h)
+    d.cor[8].From=Vector2.new(x+w-cw,y+h) d.cor[8].To=Vector2.new(x+w,y+h)
+    for i=1,8 do
+        d.cor[i].Color     = col
+        d.cor[i].Thickness = 1
+        d.cor[i].Visible   = true
+    end
+    for i=1,4 do d.box[i].Visible = false end
+end
+
+-- Render un joueur
+local function renderPlayer(player, d)
+    local char = player.Character
+    if not char then hideDrawings(d) return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum  = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum or hum.Health <= 0 then hideDrawings(d) return end
+    local sp = Camera:WorldToViewportPoint(root.Position)
+    if sp.Z <= 0 then hideDrawings(d) return end
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local dist   = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 9999
+    if dist > opt.MaxDist then hideDrawings(d) return end
+    if opt.TeamCheck and LP.Team and player.Team and LP.Team == player.Team then
+        hideDrawings(d) return
+    end
+    local bb = getBB(char)
+    if not bb then hideDrawings(d) return end
+
+    if opt.Box then
+        if opt.BoxStyle == "Corner Box" then
+            drawCorner(d, bb, opt.BoxColor)
+        else
+            drawBox(d, bb, opt.BoxColor)
+        end
+    else
+        hideDrawings(d)
+    end
+end
+
+-- Render loop
+RunService.RenderStepped:Connect(function()
+    if not opt.Enabled then return end
+    for player, d in pairs(playerData) do
+        if not player or not player.Parent then
+            removeDrawings(d)
+            playerData[player] = nil
+        else
+            pcall(renderPlayer, player, d)
+        end
+    end
+end)
+
+-- Gestion joueurs
+local function addPlayer(p)
+    if playerData[p] then return end
+    playerData[p] = createDrawings()
+    p.CharacterRemoving:Connect(function()
+        if playerData[p] then hideDrawings(playerData[p]) end
     end)
-    if not ok then _w("load err: "..path.." | "..tostring(result)) end
-    return ok and result or nil
 end
 
--- ── Global state ──────────────────────────────────────────────────
-getgenv().AuroraESP = {}
-local N = getgenv().AuroraESP
-N._version = VERSION
-
--- ══════════════════════════════════════════════════════════════════
--- CHARGEMENT ESP
--- ══════════════════════════════════════════════════════════════════
-N.ESP = load("Modules/ESP/ESP.lua")
-if N.ESP then
-    N.ESP.Init({})
-    print("[Aurora] ESP chargé ✓")
-else
-    warn("[Aurora] ESP FAILED à charger")
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LP then addPlayer(p) end
 end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LP then addPlayer(p) end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if playerData[p] then
+        removeDrawings(playerData[p])
+        playerData[p] = nil
+    end
+end)
 
 -- ══════════════════════════════════════════════════════════════════
 -- UI FLUENT
@@ -51,90 +179,64 @@ local Fluent = loadstring(game:HttpGet(
 
 local Window = Fluent:CreateWindow({
     Title       = "Aurora  •  v"..VERSION,
-    SubTitle    = "TEST — Box ESP",
+    SubTitle    = "Box ESP Test",
     TabWidth    = 160,
-    Size        = UDim2.fromOffset(600, 440),
+    Size        = UDim2.fromOffset(580, 400),
     Theme       = "Dark",
     MinimizeKey = Enum.KeyCode.Insert,
 })
 
-local Tabs = {
-    ESP      = Window:AddTab({ Title = "ESP",      Icon = "eye"      }),
-    -- Les autres tabs sont désactivés pour le test
-    -- Aimbot   = Window:AddTab({ Title = "Aimbot",   Icon = "crosshair" }),
-    -- Movement = Window:AddTab({ Title = "Movement", Icon = "zap"       }),
-    -- Misc     = Window:AddTab({ Title = "Misc",     Icon = "settings"  }),
-}
+local Tab = Window:AddTab({ Title="ESP", Icon="eye" })
 
--- ══════════════════════════════════════════════════════════════════
--- TAB ESP — BOXES UNIQUEMENT
--- ══════════════════════════════════════════════════════════════════
-Tabs.ESP:AddSection("Boxes")
+Tab:AddSection("Boxes")
 
-Tabs.ESP:AddToggle("ESPEnabled", {
-    Title    = "👁 ESP Global",
+Tab:AddToggle("ESPEnabled", {
+    Title    = "👁  ESP Global",
     Default  = false,
     Callback = function(v)
-        if N.ESP then
-            if v then N.ESP.Enable() else N.ESP.Disable() end
+        opt.Enabled = v
+        -- Si on désactive, on cache tout
+        if not v then
+            for _, d in pairs(playerData) do hideDrawings(d) end
         end
     end,
 })
 
-Tabs.ESP:AddToggle("ESPBox", {
+Tab:AddToggle("ESPBox", {
     Title    = "🟩 Box ESP",
     Default  = false,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("Box", v) end
-    end,
+    Callback = function(v) opt.Box = v end,
 })
 
-Tabs.ESP:AddDropdown("ESPBoxStyle", {
-    Title    = "Style Box",
+Tab:AddDropdown("ESPBoxStyle", {
+    Title    = "Style",
     Default  = "2D Normal",
     Values   = {"2D Normal", "Corner Box"},
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("BoxStyle", v) end
-    end,
+    Callback = function(v) opt.BoxStyle = v end,
 })
 
-Tabs.ESP:AddSection("Filtres")
+Tab:AddSection("Filtres")
 
-Tabs.ESP:AddToggle("ESPTeamCheck", {
+Tab:AddToggle("ESPTeam", {
     Title    = "👥 Team Check",
     Default  = false,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("TeamCheck", v) end
-    end,
+    Callback = function(v) opt.TeamCheck = v end,
 })
 
-Tabs.ESP:AddSlider("ESPMaxDist", {
+Tab:AddSlider("ESPDist", {
     Title    = "Distance max",
     Default  = 500,
     Min      = 50,
     Max      = 2000,
     Rounding = 0,
-    Callback = function(v)
-        if N.ESP then N.ESP.SetOption("MaxDist", v) end
-    end,
+    Callback = function(v) opt.MaxDist = v end,
 })
 
-Tabs.ESP:AddSection("Info")
-Tabs.ESP:AddParagraph({
-    Title   = "Test v"..VERSION,
-    Content = "Seules les boxes sont actives.\nActive 'ESP Global' puis 'Box ESP'.\nDis si ça marche → on ajoute la suite.",
+Tab:AddSection("Info")
+Tab:AddParagraph({
+    Title   = "Comment tester",
+    Content = "1. Active ESP Global\n2. Active Box ESP\n3. Tu dois voir des rectangles autour des joueurs",
 })
-
--- ══════════════════════════════════════════════════════════════════
--- LES OPTIONS SUIVANTES SONT DÉSACTIVÉES — SERONT RÉACTIVÉES UNE PAR UNE
--- ══════════════════════════════════════════════════════════════════
--- DÉSACTIVÉ : Skeleton, Tracers, Name, Distance, Health, FOV Circle
--- DÉSACTIVÉ : Aimbot, SilentAim, Triggerbot
--- DÉSACTIVÉ : Speed, Fly, Noclip, BunnyHop, InfJump
--- DÉSACTIVÉ : Fullbright, NoFog, AntiAFK, FPSUnlock
--- DÉSACTIVÉ : Da Hood module, Arsenal module
 
 Window:SelectTab(1)
-
-print("[Aurora v"..VERSION.."] Chargé ✓")
-print("[Aurora] Active 'ESP Global' puis 'Box ESP' pour tester")
+print("[Aurora v"..VERSION.."] Chargé — Push Main.lua UNIQUEMENT")
