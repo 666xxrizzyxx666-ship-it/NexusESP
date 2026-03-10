@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.10.0"
+local VERSION = "5.10.1"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -204,6 +204,14 @@ local function drawHealth(d, bb, hum)
     d.hbar.Color     = col
     d.hbar.Thickness = 3
     d.hbar.Visible   = true
+end
+
+local function drawDistance(distD, bb, dist)
+    distD.Text     = dist .. "m"
+    distD.Size     = 11
+    distD.Color    = Color3.fromRGB(200, 200, 200)
+    distD.Position = Vector2.new(bb.cx, bb.y + bb.height + 3)
+    distD.Visible  = true
 end
 
 local function drawName(nameD, player, bb, col)
