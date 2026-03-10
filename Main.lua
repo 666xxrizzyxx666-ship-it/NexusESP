@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.6.2"
+local VERSION = "5.6.3"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -185,27 +185,25 @@ local function getHPColor(pct)
 end
 
 local function drawHealth(d, bb, hum)
-    -- MaxHealth peut être 0 au spawn, fallback 100
     local maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
     local pct   = math.clamp(hum.Health / maxHp, 0, 1)
     local col   = getHPColor(pct)
-    local x     = bb.x - 5
     local yTop  = bb.y
     local yBot  = bb.y + bb.height
-    -- bg : ligne grise full hauteur
-    d.hbg.From      = Vector2.new(x, yTop)
-    d.hbg.To        = Vector2.new(x, yBot)
+    local xBg   = bb.x - 5   -- bg position
+    local xBar  = bb.x - 5   -- bar même position mais plus fine = visible à l'intérieur
+    -- bg : épais (5px) → gris foncé, dessiné en premier
+    d.hbg.From      = Vector2.new(xBg, yTop)
+    d.hbg.To        = Vector2.new(xBg, yBot)
     d.hbg.Color     = Color3.fromRGB(30, 30, 30)
-    d.hbg.Thickness = 3
-    d.hbg.ZIndex    = 2
+    d.hbg.Thickness = 5
     d.hbg.Visible   = true
-    -- bar : se remplit de bas en haut selon pct
+    -- bar : fine (3px) → colorée, dessinée après = au dessus du bg
     local fillY = yBot - (bb.height * pct)
-    d.hbar.From      = Vector2.new(x, yBot)
-    d.hbar.To        = Vector2.new(x, fillY)
+    d.hbar.From      = Vector2.new(xBar, yBot)
+    d.hbar.To        = Vector2.new(xBar, fillY)
     d.hbar.Color     = col
     d.hbar.Thickness = 3
-    d.hbar.ZIndex    = 3
     d.hbar.Visible   = true
 end
 
