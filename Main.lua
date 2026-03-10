@@ -1,7 +1,12 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.9.0"
+local VERSION = "5.10.0"
+
+-- Détection jeu
+local PLACE_ID     = game.PlaceId
+local IS_ARSENAL   = PLACE_ID == 286090429
+local IS_DAHOOD    = PLACE_ID == 2788229376
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,10 +27,11 @@ local opt = {
     EnemyColor  = Color3.fromRGB(255, 60, 60),
     TeamColor   = Color3.fromRGB(60, 255, 120),
     MaxDist     = 500,
+    Distance    = false,
 }
 
 local function anyEnabled()
-    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health
+    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health or opt.Distance
 end
 
 local function getColor(player)
@@ -79,7 +85,7 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine() }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), dist=newText() }
 end
 
 local function hideDrawings(d)
@@ -89,6 +95,7 @@ local function hideDrawings(d)
     for i=1,MAX_BONES do d.sk[i].Visible=false end
     d.tr.Visible=false d.name.Visible=false
     d.hbar.Visible=false
+    if d.dist then d.dist.Visible=false end
 end
 
 local function removeDrawings(d)
@@ -99,6 +106,7 @@ local function removeDrawings(d)
     pcall(function() d.tr:Remove() end)
     pcall(function() d.name:Remove() end)
     pcall(function() d.hbar:Remove() end)
+    pcall(function() d.dist:Remove() end)
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -242,6 +250,9 @@ local function renderPlayer(player, d)
 
     if opt.Health and bb then drawHealth(d, bb, hum)
     else d.hbar.Visible=false end
+
+    if opt.Distance and bb then drawDistance(d.dist, bb, dist)
+    else d.dist.Visible=false end
 end
 
 RunService.RenderStepped:Connect(function()
@@ -320,6 +331,16 @@ Tab:AddToggle("ESPName", {
 Tab:AddToggle("ESPHealth", {
     Title="Health Bar", Default=false,
     Callback=function(v) opt.Health=v end,
+})
+if IS_ARSENAL then
+    Tab:AddParagraph({
+        Title   = "⚠ Health Bar indisponible",
+        Content = "Arsenal ne réplique pas les HP des joueurs côté client. Cette option n'aura aucun effet sur ce jeu.",
+    })
+end
+Tab:AddToggle("ESPDistance", {
+    Title="Distance", Default=false,
+    Callback=function(v) opt.Distance=v end,
 })
 Tab:AddColorpicker("ESPEnemyColor", {
     Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
