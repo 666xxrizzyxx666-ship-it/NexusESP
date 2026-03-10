@@ -1,8 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
---   Aurora v5.2.0 — Main.lua — TOUT EN UN FICHIER
---   Push UNIQUEMENT ce fichier sur GitHub, rien d'autre
+--   Aurora v5.4.0 — Main.lua — TOUT EN UN FICHIER
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.3.0"
+local VERSION = "5.4.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,22 +9,26 @@ local LP         = Players.LocalPlayer
 local Camera     = workspace.CurrentCamera
 
 -- ══════════════════════════════════════════════════════════════════
--- ESP ENGINE
+-- OPTIONS
 -- ══════════════════════════════════════════════════════════════════
 local opt = {
-    Enabled   = false,
     Box       = false,
-    BoxStyle  = "2D Normal",
+    BoxStyle  = "Box",
     BoxColor  = Color3.fromRGB(255, 255, 255),
-    TeamCheck = false,
-    WallCheck = false,
-    MaxDist   = 500,
     Skeleton  = false,
+    SkelColor = Color3.fromRGB(255, 255, 255),
+    Tracers   = false,
+    TracerColor = Color3.fromRGB(255, 255, 255),
+    MaxDist   = 500,
 }
 
-local playerData = {}
+local function anyEnabled()
+    return opt.Box or opt.Skeleton or opt.Tracers
+end
 
--- Drawing helpers
+-- ══════════════════════════════════════════════════════════════════
+-- DRAWING HELPERS
+-- ══════════════════════════════════════════════════════════════════
 local function newLine()
     local l = Drawing.new("Line")
     l.Visible      = false
@@ -36,7 +39,9 @@ local function newLine()
     return l
 end
 
--- Bones R15 + R6
+-- ══════════════════════════════════════════════════════════════════
+-- SKELETON BONES
+-- ══════════════════════════════════════════════════════════════════
 local BONES_R15 = {
     {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
     {"LowerTorso","LeftUpperLeg"},{"LowerTorso","RightUpperLeg"},
@@ -52,7 +57,38 @@ local BONES_R6 = {
 }
 local MAX_BONES = #BONES_R15
 
--- Bounding box
+-- ══════════════════════════════════════════════════════════════════
+-- PLAYER DRAWINGS
+-- ══════════════════════════════════════════════════════════════════
+local playerData = {}
+
+local function createDrawings()
+    local box = {}; for i=1,4 do box[i] = newLine() end
+    local cor = {}; for i=1,8 do cor[i] = newLine() end
+    local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
+    local tr  = newLine()
+    return { box=box, cor=cor, sk=sk, tr=tr }
+end
+
+local function hideDrawings(d)
+    if not d then return end
+    for i=1,4 do d.box[i].Visible = false end
+    for i=1,8 do d.cor[i].Visible = false end
+    for i=1,MAX_BONES do d.sk[i].Visible = false end
+    d.tr.Visible = false
+end
+
+local function removeDrawings(d)
+    if not d then return end
+    for i=1,4 do pcall(function() d.box[i]:Remove() end) end
+    for i=1,8 do pcall(function() d.cor[i]:Remove() end) end
+    for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end
+    pcall(function() d.tr:Remove() end)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- BOUNDING BOX
+-- ══════════════════════════════════════════════════════════════════
 local function getBB(char)
     local root = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
@@ -67,46 +103,19 @@ local function getBB(char)
     return { x=cx-w/2, y=hs.Y, width=w, height=h, cx=cx, botY=fs.Y }
 end
 
--- Créer drawings pour un joueur
-local function createDrawings()
-    local box = {}; for i=1,4 do box[i] = newLine() end
-    local cor = {}; for i=1,8 do cor[i] = newLine() end
-    local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk }
-end
-
--- Supprimer drawings
-local function removeDrawings(d)
-    if not d then return end
-    for i=1,4 do pcall(function() d.box[i]:Remove() end) end
-    for i=1,8 do pcall(function() d.cor[i]:Remove() end) end
-    if d.sk then for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end end
-end
-
--- Cacher drawings
-local function hideDrawings(d)
-    if not d then return end
-    for i=1,4 do d.box[i].Visible = false end
-    for i=1,8 do d.cor[i].Visible = false end
-    if d.sk then for i=1,MAX_BONES do d.sk[i].Visible = false end end
-end
-
--- Box 2D normale
+-- ══════════════════════════════════════════════════════════════════
+-- DRAW FUNCTIONS
+-- ══════════════════════════════════════════════════════════════════
 local function drawBox(d, bb, col)
     local x,y,w,h = bb.x, bb.y, bb.width, bb.height
-    d.box[1].From=Vector2.new(x,y)     d.box[1].To=Vector2.new(x+w,y)
-    d.box[2].From=Vector2.new(x,y+h)   d.box[2].To=Vector2.new(x+w,y+h)
-    d.box[3].From=Vector2.new(x,y)     d.box[3].To=Vector2.new(x,y+h)
-    d.box[4].From=Vector2.new(x+w,y)   d.box[4].To=Vector2.new(x+w,y+h)
-    for i=1,4 do
-        d.box[i].Color     = col
-        d.box[i].Thickness = 1
-        d.box[i].Visible   = true
-    end
-    for i=1,8 do d.cor[i].Visible = false end
+    d.box[1].From=Vector2.new(x,y)   d.box[1].To=Vector2.new(x+w,y)
+    d.box[2].From=Vector2.new(x,y+h) d.box[2].To=Vector2.new(x+w,y+h)
+    d.box[3].From=Vector2.new(x,y)   d.box[3].To=Vector2.new(x,y+h)
+    d.box[4].From=Vector2.new(x+w,y) d.box[4].To=Vector2.new(x+w,y+h)
+    for i=1,4 do d.box[i].Color=col d.box[i].Visible=true end
+    for i=1,8 do d.cor[i].Visible=false end
 end
 
--- Corner Box
 local function drawCorner(d, bb, col)
     local x,y,w,h = bb.x, bb.y, bb.width, bb.height
     local cw, ch = w*0.28, h*0.28
@@ -118,16 +127,11 @@ local function drawCorner(d, bb, col)
     d.cor[6].From=Vector2.new(x,y+h)       d.cor[6].To=Vector2.new(x+cw,y+h)
     d.cor[7].From=Vector2.new(x+w,y+h-ch) d.cor[7].To=Vector2.new(x+w,y+h)
     d.cor[8].From=Vector2.new(x+w-cw,y+h) d.cor[8].To=Vector2.new(x+w,y+h)
-    for i=1,8 do
-        d.cor[i].Color     = col
-        d.cor[i].Thickness = 1
-        d.cor[i].Visible   = true
-    end
-    for i=1,4 do d.box[i].Visible = false end
+    for i=1,8 do d.cor[i].Color=col d.cor[i].Visible=true end
+    for i=1,4 do d.box[i].Visible=false end
 end
 
--- Draw skeleton
-local function drawSkeleton(sk, char)
+local function drawSkeleton(sk, char, col)
     local isR15 = char:FindFirstChild("UpperTorso") ~= nil
     local bones = isR15 and BONES_R15 or BONES_R6
     for i = 1, MAX_BONES do
@@ -140,11 +144,10 @@ local function drawSkeleton(sk, char)
                 local sA = Camera:WorldToViewportPoint(pA.Position)
                 local sB = Camera:WorldToViewportPoint(pB.Position)
                 if sA.Z > 0 and sB.Z > 0 then
-                    line.From      = Vector2.new(sA.X, sA.Y)
-                    line.To        = Vector2.new(sB.X, sB.Y)
-                    line.Color     = Color3.new(1,1,1)
-                    line.Thickness = 1
-                    line.Visible   = true
+                    line.From    = Vector2.new(sA.X, sA.Y)
+                    line.To      = Vector2.new(sB.X, sB.Y)
+                    line.Color   = col
+                    line.Visible = true
                 else
                     line.Visible = false
                 end
@@ -157,7 +160,18 @@ local function drawSkeleton(sk, char)
     end
 end
 
--- Render un joueur
+local function drawTracer(d, bb, col)
+    local vp = Camera.ViewportSize
+    d.tr.From      = Vector2.new(vp.X/2, vp.Y)
+    d.tr.To        = Vector2.new(bb.cx, bb.botY)
+    d.tr.Color     = col
+    d.tr.Thickness = 1
+    d.tr.Visible   = true
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- RENDER
+-- ══════════════════════════════════════════════════════════════════
 local function renderPlayer(player, d)
     local char = player.Character
     if not char then hideDrawings(d) return end
@@ -169,34 +183,38 @@ local function renderPlayer(player, d)
     local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
     local dist   = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 9999
     if dist > opt.MaxDist then hideDrawings(d) return end
-    if opt.TeamCheck and LP.Team and player.Team and LP.Team == player.Team then
-        hideDrawings(d) return
-    end
-    local bb = getBB(char)
-    if not bb then hideDrawings(d) return end
 
-    if opt.Box then
-        if opt.BoxStyle == "Corner Box" then
+    local bb = getBB(char)
+
+    -- Box
+    if opt.Box and bb then
+        if opt.BoxStyle == "CornerBox" then
             drawCorner(d, bb, opt.BoxColor)
         else
             drawBox(d, bb, opt.BoxColor)
         end
     else
-        for i=1,4 do d.box[i].Visible = false end
-        for i=1,8 do d.cor[i].Visible = false end
+        for i=1,4 do d.box[i].Visible=false end
+        for i=1,8 do d.cor[i].Visible=false end
     end
 
     -- Skeleton
-    if opt.Skeleton and d.sk then
-        drawSkeleton(d.sk, char)
+    if opt.Skeleton then
+        drawSkeleton(d.sk, char, opt.SkelColor)
     else
-        if d.sk then for i=1,MAX_BONES do d.sk[i].Visible = false end end
+        for i=1,MAX_BONES do d.sk[i].Visible=false end
+    end
+
+    -- Tracers
+    if opt.Tracers and bb then
+        drawTracer(d, bb, opt.TracerColor)
+    else
+        d.tr.Visible = false
     end
 end
 
--- Render loop
 RunService.RenderStepped:Connect(function()
-    if not opt.Enabled then return end
+    if not anyEnabled() then return end
     for player, d in pairs(playerData) do
         if not player or not player.Parent then
             removeDrawings(d)
@@ -207,7 +225,9 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Gestion joueurs
+-- ══════════════════════════════════════════════════════════════════
+-- GESTION JOUEURS
+-- ══════════════════════════════════════════════════════════════════
 local function addPlayer(p)
     if playerData[p] then return end
     playerData[p] = createDrawings()
@@ -230,7 +250,6 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ══════════════════════════════════════════════════════════════════
--- ══════════════════════════════════════════════════════════════════
 -- UI FLUENT
 -- ══════════════════════════════════════════════════════════════════
 local Fluent = loadstring(game:HttpGet(
@@ -239,7 +258,7 @@ local Fluent = loadstring(game:HttpGet(
 
 local Window = Fluent:CreateWindow({
     Title       = "Aurora  •  v"..VERSION,
-    SubTitle    = "Box ESP Test",
+    SubTitle    = "",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 400),
     Theme       = "Dark",
@@ -248,17 +267,7 @@ local Window = Fluent:CreateWindow({
 
 local Tab = Window:AddTab({ Title="ESP", Icon="eye" })
 
-Tab:AddToggle("ESPEnabled", {
-    Title    = "ESP",
-    Default  = false,
-    Callback = function(v)
-        opt.Enabled = v
-        if not v then
-            for _, d in pairs(playerData) do hideDrawings(d) end
-        end
-    end,
-})
-
+-- Box
 Tab:AddToggle("ESPBox", {
     Title    = "Box",
     Default  = false,
@@ -266,16 +275,52 @@ Tab:AddToggle("ESPBox", {
 })
 
 Tab:AddDropdown("ESPBoxStyle", {
-    Title    = "Style Box",
-    Default  = "2D Normal",
-    Values   = {"2D Normal", "Corner Box"},
+    Title    = "Style",
+    Default  = "Box",
+    Values   = {"Box", "CornerBox"},
     Callback = function(v) opt.BoxStyle = v end,
 })
 
+Tab:AddColorpicker("ESPBoxColor", {
+    Title   = "Couleur Box",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(v) opt.BoxColor = v end,
+})
+
+-- Skeleton
 Tab:AddToggle("ESPSkeleton", {
     Title    = "Skeleton",
     Default  = false,
     Callback = function(v) opt.Skeleton = v end,
+})
+
+Tab:AddColorpicker("ESPSkelColor", {
+    Title   = "Couleur Skeleton",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(v) opt.SkelColor = v end,
+})
+
+-- Tracers
+Tab:AddToggle("ESPTracers", {
+    Title    = "Tracers",
+    Default  = false,
+    Callback = function(v) opt.Tracers = v end,
+})
+
+Tab:AddColorpicker("ESPTracerColor", {
+    Title   = "Couleur Tracers",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(v) opt.TracerColor = v end,
+})
+
+-- Distance
+Tab:AddSlider("ESPDist", {
+    Title    = "Distance max",
+    Default  = 500,
+    Min      = 50,
+    Max      = 2000,
+    Rounding = 0,
+    Callback = function(v) opt.MaxDist = v end,
 })
 
 Window:SelectTab(1)
