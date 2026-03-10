@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.13.1"
+local VERSION = "6.0.0"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -458,6 +458,132 @@ Tab:AddColorpicker("ESPTeamColor", {
 Tab:AddSlider("ESPDist", {
     Title="Distance max", Default=500, Min=50, Max=2000, Rounding=0,
     Callback=function(v) opt.MaxDist=v end,
+})
+
+-- ══════════════════════════════════════════════════════════════════
+-- AIMBOT ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local aimbotOpt = {
+    Enabled    = false,
+    FOV        = 120,
+    Smoothness = 10,
+    Bone       = "Head",
+    TeamCheck  = true,
+    HoldKey    = true,  -- maintenir clic droit pour viser
+}
+
+-- FOV Circle (64 segments)
+local FOV_SEG  = 64
+local fovLines = {}
+for i = 1, FOV_SEG do
+    local l = Drawing.new("Line")
+    l.Visible   = false
+    l.Thickness = 1
+    l.Color     = Color3.fromRGB(255, 255, 255)
+    l.ZIndex    = 6
+    fovLines[i] = l
+end
+
+local function renderFOV()
+    local show = aimbotOpt.Enabled
+    local cx   = Camera.ViewportSize.X / 2
+    local cy   = Camera.ViewportSize.Y / 2
+    local r    = aimbotOpt.FOV
+    for i = 1, FOV_SEG do
+        local l  = fovLines[i]
+        if show then
+            local a1 = (i-1)/FOV_SEG * math.pi*2
+            local a2 = i    /FOV_SEG * math.pi*2
+            l.From    = Vector2.new(cx + math.cos(a1)*r, cy + math.sin(a1)*r)
+            l.To      = Vector2.new(cx + math.cos(a2)*r, cy + math.sin(a2)*r)
+            l.Visible = true
+        else
+            l.Visible = false
+        end
+    end
+end
+
+local UIS = game:GetService("UserInputService")
+
+local function getBestTarget()
+    local center   = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local best     = nil
+    local bestDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character then
+            local char = player.Character
+            local hum  = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                -- Team check
+                if aimbotOpt.TeamCheck and LP.Team and player.Team and LP.Team == player.Team then
+                    -- skip teammate
+                else
+                    local bone = char:FindFirstChild(aimbotOpt.Bone)
+                        or char:FindFirstChild("HumanoidRootPart")
+                    if bone then
+                        local sp = Camera:WorldToViewportPoint(bone.Position)
+                        if sp.Z > 0 then
+                            local screenPos = Vector2.new(sp.X, sp.Y)
+                            local dist      = (screenPos - center).Magnitude
+                            if dist <= aimbotOpt.FOV and dist < bestDist then
+                                bestDist = dist
+                                best     = bone
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+RunService:BindToRenderStep("AuroraAimbot", Enum.RenderPriority.Camera.Value + 2, function()
+    renderFOV()
+    if not aimbotOpt.Enabled then return end
+
+    local holding = aimbotOpt.HoldKey
+        and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        or not aimbotOpt.HoldKey
+
+    if not holding then return end
+
+    local bone = getBestTarget()
+    if not bone then return end
+
+    local camCF    = Camera.CFrame
+    local targetCF = CFrame.new(camCF.Position, bone.Position)
+    local smooth   = math.max(1, aimbotOpt.Smoothness)
+    Camera.CFrame  = camCF:Lerp(targetCF, 1 / smooth)
+end)
+
+-- ── Aimbot UI ─────────────────────────────────────────────────────
+local TabAim = Window:AddTab({ Title="Aimbot", Icon="crosshair" })
+
+TabAim:AddToggle("AimEnabled", {
+    Title="Aimbot", Default=false,
+    Callback=function(v) aimbotOpt.Enabled=v end,
+})
+TabAim:AddToggle("AimHoldKey", {
+    Title="Hold Clic Droit pour viser", Default=true,
+    Callback=function(v) aimbotOpt.HoldKey=v end,
+})
+TabAim:AddSlider("AimFOV", {
+    Title="FOV", Default=120, Min=10, Max=500, Rounding=0,
+    Callback=function(v) aimbotOpt.FOV=v end,
+})
+TabAim:AddSlider("AimSmooth", {
+    Title="Smoothness", Default=10, Min=1, Max=50, Rounding=0,
+    Callback=function(v) aimbotOpt.Smoothness=v end,
+})
+TabAim:AddDropdown("AimBone", {
+    Title="Bone", Default="Head", Values={"Head","HumanoidRootPart","UpperTorso"},
+    Callback=function(v) aimbotOpt.Bone=v end,
+})
+TabAim:AddToggle("AimTeamCheck", {
+    Title="Team Check", Default=true,
+    Callback=function(v) aimbotOpt.TeamCheck=v end,
 })
 
 Window:SelectTab(1)
