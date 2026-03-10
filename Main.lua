@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
---   Aurora v5.4.0 — Main.lua — TOUT EN UN FICHIER
+--   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.4.0"
+local VERSION = "5.5.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,18 +12,25 @@ local Camera     = workspace.CurrentCamera
 -- OPTIONS
 -- ══════════════════════════════════════════════════════════════════
 local opt = {
-    Box       = false,
-    BoxStyle  = "Box",
-    BoxColor  = Color3.fromRGB(255, 255, 255),
-    Skeleton  = false,
-    SkelColor = Color3.fromRGB(255, 255, 255),
-    Tracers   = false,
-    TracerColor = Color3.fromRGB(255, 255, 255),
-    MaxDist   = 500,
+    Box         = false,
+    BoxStyle    = "Box",
+    Skeleton    = false,
+    Tracers     = false,
+    Name        = false,
+    EnemyColor  = Color3.fromRGB(255, 60, 60),
+    TeamColor   = Color3.fromRGB(60, 255, 120),
+    MaxDist     = 500,
 }
 
 local function anyEnabled()
-    return opt.Box or opt.Skeleton or opt.Tracers
+    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name
+end
+
+local function getColor(player)
+    if LP.Team and player.Team and LP.Team == player.Team then
+        return opt.TeamColor
+    end
+    return opt.EnemyColor
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -31,16 +38,20 @@ end
 -- ══════════════════════════════════════════════════════════════════
 local function newLine()
     local l = Drawing.new("Line")
-    l.Visible      = false
-    l.Thickness    = 1
-    l.Color        = Color3.new(1,1,1)
-    l.Transparency = 1
-    l.ZIndex       = 2
+    l.Visible = false l.Thickness = 1
+    l.Color = Color3.new(1,1,1) l.Transparency = 1 l.ZIndex = 2
     return l
 end
 
+local function newText()
+    local t = Drawing.new("Text")
+    t.Visible = false t.Center = true t.Outline = true
+    t.Size = 13 t.Font = Drawing.Fonts.Plex
+    return t
+end
+
 -- ══════════════════════════════════════════════════════════════════
--- SKELETON BONES
+-- BONES
 -- ══════════════════════════════════════════════════════════════════
 local BONES_R15 = {
     {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
@@ -66,16 +77,15 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    local tr  = newLine()
-    return { box=box, cor=cor, sk=sk, tr=tr }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText() }
 end
 
 local function hideDrawings(d)
     if not d then return end
-    for i=1,4 do d.box[i].Visible = false end
-    for i=1,8 do d.cor[i].Visible = false end
-    for i=1,MAX_BONES do d.sk[i].Visible = false end
-    d.tr.Visible = false
+    for i=1,4 do d.box[i].Visible=false end
+    for i=1,8 do d.cor[i].Visible=false end
+    for i=1,MAX_BONES do d.sk[i].Visible=false end
+    d.tr.Visible=false d.name.Visible=false
 end
 
 local function removeDrawings(d)
@@ -84,6 +94,7 @@ local function removeDrawings(d)
     for i=1,8 do pcall(function() d.cor[i]:Remove() end) end
     for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end
     pcall(function() d.tr:Remove() end)
+    pcall(function() d.name:Remove() end)
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -98,7 +109,7 @@ local function getBB(char)
     if hs.Z <= 0 or fs.Z <= 0 then return nil end
     local h = math.abs(hs.Y - fs.Y)
     if h < 5 then return nil end
-    local w  = h * 0.55
+    local w = h * 0.55
     local cx = (hs.X + fs.X) / 2
     return { x=cx-w/2, y=hs.Y, width=w, height=h, cx=cx, botY=fs.Y }
 end
@@ -144,29 +155,25 @@ local function drawSkeleton(sk, char, col)
                 local sA = Camera:WorldToViewportPoint(pA.Position)
                 local sB = Camera:WorldToViewportPoint(pB.Position)
                 if sA.Z > 0 and sB.Z > 0 then
-                    line.From    = Vector2.new(sA.X, sA.Y)
-                    line.To      = Vector2.new(sB.X, sB.Y)
-                    line.Color   = col
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            else
-                line.Visible = false
-            end
-        else
-            line.Visible = false
-        end
+                    line.From=Vector2.new(sA.X,sA.Y) line.To=Vector2.new(sB.X,sB.Y)
+                    line.Color=col line.Visible=true
+                else line.Visible=false end
+            else line.Visible=false end
+        else line.Visible=false end
     end
 end
 
-local function drawTracer(d, bb, col)
+local function drawTracer(tr, bb, col)
     local vp = Camera.ViewportSize
-    d.tr.From      = Vector2.new(vp.X/2, vp.Y)
-    d.tr.To        = Vector2.new(bb.cx, bb.botY)
-    d.tr.Color     = col
-    d.tr.Thickness = 1
-    d.tr.Visible   = true
+    tr.From=Vector2.new(vp.X/2, vp.Y) tr.To=Vector2.new(bb.cx, bb.botY)
+    tr.Color=col tr.Thickness=1 tr.Visible=true
+end
+
+local function drawName(nameD, player, bb, col)
+    nameD.Text     = player.Name
+    nameD.Color    = col
+    nameD.Position = Vector2.new(bb.cx, bb.y - 16)
+    nameD.Visible  = true
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -184,41 +191,32 @@ local function renderPlayer(player, d)
     local dist   = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 9999
     if dist > opt.MaxDist then hideDrawings(d) return end
 
-    local bb = getBB(char)
+    local col = getColor(player)
+    local bb  = getBB(char)
 
-    -- Box
     if opt.Box and bb then
-        if opt.BoxStyle == "CornerBox" then
-            drawCorner(d, bb, opt.BoxColor)
-        else
-            drawBox(d, bb, opt.BoxColor)
-        end
+        if opt.BoxStyle == "CornerBox" then drawCorner(d, bb, col)
+        else drawBox(d, bb, col) end
     else
         for i=1,4 do d.box[i].Visible=false end
         for i=1,8 do d.cor[i].Visible=false end
     end
 
-    -- Skeleton
-    if opt.Skeleton then
-        drawSkeleton(d.sk, char, opt.SkelColor)
-    else
-        for i=1,MAX_BONES do d.sk[i].Visible=false end
-    end
+    if opt.Skeleton then drawSkeleton(d.sk, char, col)
+    else for i=1,MAX_BONES do d.sk[i].Visible=false end end
 
-    -- Tracers
-    if opt.Tracers and bb then
-        drawTracer(d, bb, opt.TracerColor)
-    else
-        d.tr.Visible = false
-    end
+    if opt.Tracers and bb then drawTracer(d.tr, bb, col)
+    else d.tr.Visible=false end
+
+    if opt.Name and bb then drawName(d.name, player, bb, col)
+    else d.name.Visible=false end
 end
 
 RunService.RenderStepped:Connect(function()
     if not anyEnabled() then return end
     for player, d in pairs(playerData) do
         if not player or not player.Parent then
-            removeDrawings(d)
-            playerData[player] = nil
+            removeDrawings(d) playerData[player]=nil
         else
             pcall(renderPlayer, player, d)
         end
@@ -239,14 +237,9 @@ end
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LP then addPlayer(p) end
 end
-Players.PlayerAdded:Connect(function(p)
-    if p ~= LP then addPlayer(p) end
-end)
+Players.PlayerAdded:Connect(function(p) if p ~= LP then addPlayer(p) end end)
 Players.PlayerRemoving:Connect(function(p)
-    if playerData[p] then
-        removeDrawings(playerData[p])
-        playerData[p] = nil
-    end
+    if playerData[p] then removeDrawings(playerData[p]) playerData[p]=nil end
 end)
 
 -- ══════════════════════════════════════════════════════════════════
@@ -267,60 +260,37 @@ local Window = Fluent:CreateWindow({
 
 local Tab = Window:AddTab({ Title="ESP", Icon="eye" })
 
--- Box
 Tab:AddToggle("ESPBox", {
-    Title    = "Box",
-    Default  = false,
-    Callback = function(v) opt.Box = v end,
+    Title="Box", Default=false,
+    Callback=function(v) opt.Box=v end,
 })
-
 Tab:AddDropdown("ESPBoxStyle", {
-    Title    = "Style",
-    Default  = "Box",
-    Values   = {"Box", "CornerBox"},
-    Callback = function(v) opt.BoxStyle = v end,
+    Title="Style", Default="Box", Values={"Box","CornerBox"},
+    Callback=function(v) opt.BoxStyle=v end,
 })
-
-Tab:AddColorpicker("ESPBoxColor", {
-    Title   = "Couleur Box",
-    Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(v) opt.BoxColor = v end,
-})
-
--- Skeleton
 Tab:AddToggle("ESPSkeleton", {
-    Title    = "Skeleton",
-    Default  = false,
-    Callback = function(v) opt.Skeleton = v end,
+    Title="Skeleton", Default=false,
+    Callback=function(v) opt.Skeleton=v end,
 })
-
-Tab:AddColorpicker("ESPSkelColor", {
-    Title   = "Couleur Skeleton",
-    Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(v) opt.SkelColor = v end,
-})
-
--- Tracers
 Tab:AddToggle("ESPTracers", {
-    Title    = "Tracers",
-    Default  = false,
-    Callback = function(v) opt.Tracers = v end,
+    Title="Tracers", Default=false,
+    Callback=function(v) opt.Tracers=v end,
 })
-
-Tab:AddColorpicker("ESPTracerColor", {
-    Title   = "Couleur Tracers",
-    Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(v) opt.TracerColor = v end,
+Tab:AddToggle("ESPName", {
+    Title="Name", Default=false,
+    Callback=function(v) opt.Name=v end,
 })
-
--- Distance
+Tab:AddColorpicker("ESPEnemyColor", {
+    Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
+    Callback=function(v) opt.EnemyColor=v end,
+})
+Tab:AddColorpicker("ESPTeamColor", {
+    Title="Team Color", Default=Color3.fromRGB(60,255,120),
+    Callback=function(v) opt.TeamColor=v end,
+})
 Tab:AddSlider("ESPDist", {
-    Title    = "Distance max",
-    Default  = 500,
-    Min      = 50,
-    Max      = 2000,
-    Rounding = 0,
-    Callback = function(v) opt.MaxDist = v end,
+    Title="Distance max", Default=500, Min=50, Max=2000, Rounding=0,
+    Callback=function(v) opt.MaxDist=v end,
 })
 
 Window:SelectTab(1)
