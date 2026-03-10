@@ -225,7 +225,7 @@ local Window = Fluent:CreateWindow({
     Title       = "Aurora  •  v"..VERSION,
     SubTitle    = "ESP — Boxes",
     TabWidth    = 160,
-    Size        = Vector2.new(580, 400),
+    Size        = UDim2.fromOffset(580, 400),
     Theme       = "Dark",
     MinimizeKey = Enum.KeyCode.Insert,
 })
