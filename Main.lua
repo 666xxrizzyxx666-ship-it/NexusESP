@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.6.1"
+local VERSION = "5.6.2"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -197,6 +197,7 @@ local function drawHealth(d, bb, hum)
     d.hbg.To        = Vector2.new(x, yBot)
     d.hbg.Color     = Color3.fromRGB(30, 30, 30)
     d.hbg.Thickness = 3
+    d.hbg.ZIndex    = 2
     d.hbg.Visible   = true
     -- bar : se remplit de bas en haut selon pct
     local fillY = yBot - (bb.height * pct)
@@ -204,6 +205,7 @@ local function drawHealth(d, bb, hum)
     d.hbar.To        = Vector2.new(x, fillY)
     d.hbar.Color     = col
     d.hbar.Thickness = 3
+    d.hbar.ZIndex    = 3
     d.hbar.Visible   = true
 end
 
