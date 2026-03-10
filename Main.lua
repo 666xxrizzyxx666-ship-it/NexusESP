@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.7.1"
+local VERSION = "5.8.0"
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -79,9 +79,7 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    local hbg  = newLine()
-    local hbar = newLine()
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbg=hbg, hbar=hbar, hp=100, maxHp=100 }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), hp=100, maxHp=100 }
 end
 
 local function hideDrawings(d)
@@ -90,7 +88,7 @@ local function hideDrawings(d)
     for i=1,8 do d.cor[i].Visible=false end
     for i=1,MAX_BONES do d.sk[i].Visible=false end
     d.tr.Visible=false d.name.Visible=false
-    d.hbg.Visible=false d.hbar.Visible=false
+    d.hbar.Visible=false
 end
 
 local function removeDrawings(d)
@@ -100,7 +98,6 @@ local function removeDrawings(d)
     for i=1,MAX_BONES do pcall(function() d.sk[i]:Remove() end) end
     pcall(function() d.tr:Remove() end)
     pcall(function() d.name:Remove() end)
-    pcall(function() d.hbg:Remove() end)
     pcall(function() d.hbar:Remove() end)
 end
 
@@ -185,22 +182,13 @@ local function getHPColor(pct)
 end
 
 local function drawHealth(d, bb)
-    -- hp/maxHp sont mis à jour par HealthChanged event, pas lu chaque frame
-    local pct   = math.clamp(d.hp / d.maxHp, 0, 1)
-    local col   = getHPColor(pct)
-    local x     = bb.x - 5
-    local yTop  = bb.y
-    local yBot  = bb.y + bb.height
-    -- bg gris (5px)
-    d.hbg.From      = Vector2.new(x, yTop)
-    d.hbg.To        = Vector2.new(x, yBot)
-    d.hbg.Color     = Color3.fromRGB(30, 30, 30)
-    d.hbg.Thickness = 5
-    d.hbg.Visible   = true
-    -- barre colorée (3px) = toujours visible à l'intérieur du bg
-    local fillY = yBot - (bb.height * pct)
+    local pct  = math.clamp(d.hp / d.maxHp, 0, 1)
+    local col  = getHPColor(pct)
+    local x    = bb.x - 4
+    local yBot = bb.y + bb.height
+    local yTop = bb.y + bb.height * (1 - pct)
     d.hbar.From      = Vector2.new(x, yBot)
-    d.hbar.To        = Vector2.new(x, fillY)
+    d.hbar.To        = Vector2.new(x, yTop)
     d.hbar.Color     = col
     d.hbar.Thickness = 3
     d.hbar.Visible   = true
@@ -249,7 +237,7 @@ local function renderPlayer(player, d)
     else d.name.Visible=false end
 
     if opt.Health and bb then drawHealth(d, bb)
-    else d.hbg.Visible=false d.hbar.Visible=false end
+    else d.hbar.Visible=false end
 end
 
 RunService.RenderStepped:Connect(function()
