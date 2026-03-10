@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "5.11.3"
+local VERSION = "5.12.0"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -29,10 +29,12 @@ local opt = {
     MaxDist     = 500,
     Distance    = false,
     Weapon      = false,
+    Chams       = false,
+    ChamsStyle  = "Outline",
 }
 
 local function anyEnabled()
-    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health or opt.Distance or opt.Weapon
+    return opt.Box or opt.Skeleton or opt.Tracers or opt.Name or opt.Health or opt.Distance or opt.Weapon or opt.Chams
 end
 
 local function getColor(player)
@@ -86,7 +88,7 @@ local function createDrawings()
     local box = {}; for i=1,4 do box[i] = newLine() end
     local cor = {}; for i=1,8 do cor[i] = newLine() end
     local sk  = {}; for i=1,MAX_BONES do sk[i] = newLine() end
-    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), dist=newText(), weap=newText() }
+    return { box=box, cor=cor, sk=sk, tr=newLine(), name=newText(), hbar=newLine(), dist=newText(), weap=newText(), highlight=nil }
 end
 
 local function hideDrawings(d)
@@ -110,6 +112,7 @@ local function removeDrawings(d)
     pcall(function() d.hbar:Remove() end)
     pcall(function() d.dist:Remove() end)
     pcall(function() d.weap:Remove() end)
+    if d.highlight then pcall(function() d.highlight:Destroy() end) d.highlight=nil end
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -209,6 +212,38 @@ local function drawHealth(d, bb, hum)
     d.hbar.Visible   = true
 end
 
+local function updateChams(d, player, col)
+    local char = player.Character
+    if not char then
+        if d.highlight then d.highlight.Enabled=false end
+        return
+    end
+    -- Crée le Highlight si pas encore fait
+    if not d.highlight then
+        local h = Instance.new("Highlight")
+        h.DepthMode        = Enum.HighlightDepthMode.AlwaysOnTop
+        h.FillTransparency = 1
+        h.OutlineTransparency = 0
+        h.Parent           = char
+        d.highlight        = h
+    else
+        -- Reparent si le character a changé
+        if d.highlight.Parent ~= char then
+            d.highlight.Parent = char
+        end
+    end
+    if opt.ChamsStyle == "Filled" then
+        d.highlight.FillTransparency    = 0.5
+        d.highlight.OutlineTransparency = 0
+    else -- Outline only
+        d.highlight.FillTransparency    = 1
+        d.highlight.OutlineTransparency = 0
+    end
+    d.highlight.FillColor    = col
+    d.highlight.OutlineColor = col
+    d.highlight.Enabled      = true
+end
+
 local function drawWeapon(weapD, player, char, bb, col)
     local weapName = nil
     -- Arsenal : StringValue "EquippedWep" dans le character
@@ -288,6 +323,12 @@ local function renderPlayer(player, d)
 
     if opt.Weapon and bb then drawWeapon(d.weap, player, char, bb, col)
     else d.weap.Visible=false end
+
+    if opt.Chams then
+        updateChams(d, player, col)
+    else
+        if d.highlight then d.highlight.Enabled=false end
+    end
 end
 
 RunService:BindToRenderStep("AuroraESP", Enum.RenderPriority.Camera.Value + 1, function()
@@ -380,6 +421,14 @@ Tab:AddToggle("ESPDistance", {
 Tab:AddToggle("ESPWeapon", {
     Title="Weapon", Default=false,
     Callback=function(v) opt.Weapon=v end,
+})
+Tab:AddToggle("ESPChams", {
+    Title="Chams", Default=false,
+    Callback=function(v) opt.Chams=v end,
+})
+Tab:AddDropdown("ESPChamsStyle", {
+    Title="Style Chams", Default="Outline", Values={"Outline","Filled"},
+    Callback=function(v) opt.ChamsStyle=v end,
 })
 Tab:AddColorpicker("ESPEnemyColor", {
     Title="Enemy Color", Default=Color3.fromRGB(255,60,60),
