@@ -764,8 +764,7 @@ local miscOpt = {
     Fullbright   = false,
     NoFog        = false,
     AntiAFK      = false,
-    ThirdPerson  = false,
-    TPDist       = 12,
+
 }
 
 local miscConns = {}
@@ -861,26 +860,7 @@ local function applyAntiAFK()
 end
 
 -- ── Third Person ──────────────────────────────────────────────────
-local function applyThirdPerson()
-    miscClean("tp")
-    if not miscOpt.ThirdPerson then
-        Camera.CameraType = Enum.CameraType.Custom
-        return
-    end
-    -- Arsenal override le zoom donc on positionne la cam manuellement
-    Camera.CameraType = Enum.CameraType.Scriptable
-    miscConns["tp"] = RunService.RenderStepped:Connect(function()
-        if not miscOpt.ThirdPerson then return end
-        local char = LP.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local dist    = miscOpt.TPDist
-        local camCF   = Camera.CFrame
-        local lookVec = camCF.LookVector
-        local pos     = root.Position - lookVec * dist + Vector3.new(0, 2, 0)
-        Camera.CFrame = CFrame.new(pos, pos + lookVec)
-    end)
-end
+
 
 LP.CharacterAdded:Connect(function()
     if miscOpt.InfAmmo    then task.wait(0.1) applyInfAmmo()   end
@@ -918,13 +898,9 @@ TabWorld:AddToggle("MiscNoFog", {
     Title="No Fog", Default=false,
     Callback=function(v) miscOpt.NoFog=v applyNoFog() end,
 })
-TabWorld:AddToggle("MiscThirdPerson", {
-    Title="Third Person", Default=false,
-    Callback=function(v) miscOpt.ThirdPerson=v applyThirdPerson() end,
-})
-TabWorld:AddSlider("MiscTPDist", {
-    Title="Distance Caméra", Default=12, Min=5, Max=50, Rounding=0,
-    Callback=function(v) miscOpt.TPDist=v if miscOpt.ThirdPerson then applyThirdPerson() end end,
+TabWorld:AddParagraph({
+    Title="ℹ Third Person",
+    Content="Cette option sera disponible dans l'UI finale. Arsenal empêche la modification du zoom.",
 })
 
 -- ── Misc tab ──────────────────────────────────────────────────────
