@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v7.0.0 — All-in-One
 -- ══════════════════════════════════════════════════════════════════
-local VERSION    = "7.0.0"
+local VERSION    = "7.1.0"
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS        = game:GetService("UserInputService")
@@ -34,16 +34,6 @@ local function anyESP()
         or opt.Chams or opt.HeadDot or opt.HandChams
 end
 
-local function isVisible(root)
-    local ray = Ray.new(Camera.CFrame.Position,
-        (root.Position - Camera.CFrame.Position).Unit * 1000)
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray,
-        {LP.Character, workspace.CurrentCamera})
-    if not hit then return true end
-    return hit:IsDescendantOf(workspace) == false
-        or hit.Transparency >= 0.9
-end
-
 local function getColor(player, root)
     if opt.TeamCheck and LP.Team and player.Team and LP.Team==player.Team then
         return nil
@@ -52,7 +42,15 @@ local function getColor(player, root)
         return opt.TeamColor
     end
     if opt.WallCheck and root then
-        return isVisible(root) and opt.VisibleColor or opt.NotVisibleColor
+        -- cast ray depuis camera vers le joueur
+        local dir=(root.Position-Camera.CFrame.Position)
+        local dist=dir.Magnitude
+        local params=RaycastParams.new()
+        params.FilterDescendantsInstances={LP.Character,workspace.CurrentCamera}
+        params.FilterType=Enum.RaycastFilterType.Exclude
+        local result=workspace:Raycast(Camera.CFrame.Position,dir.Unit*(dist-1),params)
+        local visible=result==nil
+        return visible and opt.VisibleColor or opt.NotVisibleColor
     end
     return opt.EnemyColor
 end
@@ -256,17 +254,28 @@ local function updateChams(d,player,col)
     d.highlight.Enabled=true
 end
 local function updateHandChams(d,char)
-    if not char then if d.handhl then d.handhl.Enabled=false end return end
-    local leftHand=char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm")
-    local rightHand=char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
-    if not leftHand and not rightHand then
+    if not char then
         if d.handhl then d.handhl.Enabled=false end return
     end
+    -- Crée un Highlight sur les mains uniquement via un dossier temporaire
     if not d.handhl then
         local h=Instance.new("Highlight")
         h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent=char d.handhl=h
+        h.FillTransparency=opt.HandChamsTransp
+        h.OutlineTransparency=0
+        h.FillColor=opt.HandChamsColor
+        h.OutlineColor=opt.HandChamsColor
+        -- on parent au char entier mais on masque tout sauf les mains via adornee
+        local hand=char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+            or char:FindFirstChild("RightLowerArm")
+        if not hand then h.Parent=nil d.handhl=h return end
+        h.Adornee=hand
+        h.Parent=char
+        d.handhl=h
     else
+        local hand=char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+            or char:FindFirstChild("RightLowerArm")
+        if hand then d.handhl.Adornee=hand end
         if d.handhl.Parent~=char then d.handhl.Parent=char end
     end
     d.handhl.FillColor=opt.HandChamsColor
@@ -732,16 +741,22 @@ local function applyInfJump()
 end
 local function applyJumpPower()
     movClean("jumppower")
-    if not movOpt.JumpPower then
-        local char=LP.Character
-        local hum=char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.JumpPower=50 end return
-    end
+    if not movOpt.JumpPower then return end
     movConns["jumppower"]=RunService.Heartbeat:Connect(function()
         if not movOpt.JumpPower then return end
         local char=LP.Character
+        local root=char and char:FindFirstChild("HumanoidRootPart")
         local hum=char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.JumpPower=movOpt.JumpPowerVal end
+        if not root or not hum then return end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            if hum.FloorMaterial~=Enum.Material.Air then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                root.AssemblyLinearVelocity=Vector3.new(
+                    root.AssemblyLinearVelocity.X,
+                    movOpt.JumpPowerVal,
+                    root.AssemblyLinearVelocity.Z)
+            end
+        end
     end)
 end
 -- Click TP
@@ -751,7 +766,10 @@ local function applyClickTP()
     if not movOpt.ClickTP then return end
     clickTPConn=UIS.InputBegan:Connect(function(input,gpe)
         if gpe or not movOpt.ClickTP then return end
-        if input.UserInputType==Enum.UserInputType.MouseButton1 then
+        -- T key ou MouseButton1
+        local isT=input.KeyCode==Enum.KeyCode.T
+        local isClick=input.UserInputType==Enum.UserInputType.MouseButton1
+        if isT or isClick then
             local mouse=LP:GetMouse()
             local target=mouse.Hit
             if target then
@@ -765,42 +783,53 @@ end
 -- Free Camera
 local freeCamConn=nil
 local freeCamCF=nil
+local freeCamSprintDown=false
 local function applyFreeCamera()
     movClean("freecam")
     if freeCamConn then freeCamConn:Disconnect() freeCamConn=nil end
     if not movOpt.FreeCamera then
+        -- teleport joueur à la position freecam au retour
         if freeCamCF then
-            -- teleport player to freecam position
             local char=LP.Character
             local root=char and char:FindFirstChild("HumanoidRootPart")
-            if root and freeCamCF then
-                root.CFrame=CFrame.new(freeCamCF.Position)
-            end
+            if root then root.CFrame=CFrame.new(freeCamCF.Position) end
         end
         Camera.CameraType=Enum.CameraType.Custom
+        -- reaffiche le character
+        local char=LP.Character
+        if char then for _,p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") or p:IsA("Decal") then p.LocalTransparencyModifier=0 end
+        end end
         return
     end
     Camera.CameraType=Enum.CameraType.Scriptable
     freeCamCF=Camera.CFrame
-    local sprint=false
+    -- cache le character localement
+    local char=LP.Character
+    if char then for _,p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") or p:IsA("Decal") then p.LocalTransparencyModifier=1 end
+    end end
     freeCamConn=UIS.InputBegan:Connect(function(i,gpe)
-        if i.KeyCode==Enum.KeyCode.LeftShift then sprint=true end
+        if i.KeyCode==Enum.KeyCode.LeftShift then freeCamSprintDown=true end
     end)
     UIS.InputEnded:Connect(function(i)
-        if i.KeyCode==Enum.KeyCode.LeftShift then sprint=false end
+        if i.KeyCode==Enum.KeyCode.LeftShift then freeCamSprintDown=false end
     end)
     movConns["freecam"]=RunService.RenderStepped:Connect(function(dt)
         if not movOpt.FreeCamera then return end
-        local speed=movOpt.FreeCamSpeed*(sprint and movOpt.FreeCamSprintMult or 1)*dt
+        local speed=movOpt.FreeCamSpeed*(freeCamSprintDown and movOpt.FreeCamSprintMult or 1)*dt
         local cf=freeCamCF
-        if UIS:IsKeyDown(Enum.KeyCode.W) then cf=cf*CFrame.new(0,0,-speed) end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then cf=cf*CFrame.new(0,0,speed) end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then cf=cf*CFrame.new(-speed,0,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then cf=cf*CFrame.new(speed,0,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then cf=cf*CFrame.new(0,speed,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then cf=cf*CFrame.new(0,-speed,0) end
+        local lookVec=cf.LookVector
+        local rightVec=cf.RightVector
+        if UIS:IsKeyDown(Enum.KeyCode.W) then cf=CFrame.new(cf.Position+lookVec*speed)*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then cf=CFrame.new(cf.Position-lookVec*speed)*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then cf=CFrame.new(cf.Position-rightVec*speed)*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then cf=CFrame.new(cf.Position+rightVec*speed)*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then cf=CFrame.new(cf.Position+Vector3.new(0,speed,0))*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then cf=CFrame.new(cf.Position-Vector3.new(0,speed,0))*CFrame.fromEulerAnglesXYZ(cf:ToEulerAnglesXYZ()) end
         local delta=UIS:GetMouseDelta()
-        cf=cf*CFrame.Angles(0,-delta.X*0.003,0)*CFrame.Angles(-delta.Y*0.003,0,0)
+        local rx,ry,rz=cf:ToEulerAnglesXYZ()
+        cf=CFrame.new(cf.Position)*CFrame.Angles(0,ry-delta.X*0.003,0)*CFrame.Angles(math.clamp(rx-delta.Y*0.003,-1.5,1.5),0,0)
         freeCamCF=cf Camera.CFrame=cf
     end)
 end
@@ -1098,16 +1127,16 @@ local TabRadar=Window:AddTab({Title="Radar",Icon="map"})
 TabRadar:AddToggle("RadarEnabled",{Title="Radar",Default=false,Callback=function(v) radarOpt.Enabled=v buildRadar() end})
 TabRadar:AddToggle("RadarTeamCheck",{Title="Team Check",Default=false,Callback=function(v) radarOpt.TeamCheck=v end})
 TabRadar:AddToggle("RadarNames",{Title="Afficher Noms",Default=false,Callback=function(v) radarOpt.ShowNames=v buildRadar() end})
-TabRadar:AddSlider("RadarSize",{Title="Taille Radar",Default=200,Min=100,Max=400,Rounding=0,Callback=function(v) radarOpt.Size=v buildRadar() end})
+TabRadar:AddSlider("RadarSize",{Title="Taille Radar",Default=200,Min=100,Max=400,Rounding=0,Callback=function(v) radarOpt.Size=v if radarGui then radarGui.bg.Size=UDim2.fromOffset(v,v) radarGui.bg.Position=getRadarPos() end end})
 TabRadar:AddSlider("RadarDist",{Title="Distance Max",Default=300,Min=50,Max=1000,Rounding=0,Callback=function(v) radarOpt.MaxDist=v end})
-TabRadar:AddSlider("RadarPlayerSize",{Title="Taille Points",Default=5,Min=2,Max=15,Rounding=0,Callback=function(v) radarOpt.PlayerSize=v buildRadar() end})
-TabRadar:AddDropdown("RadarPos",{Title="Position",Default="Bottom Right",Values={"Top Left","Top Right","Bottom Left","Bottom Right"},Callback=function(v) radarOpt.Position=v buildRadar() end})
+TabRadar:AddSlider("RadarPlayerSize",{Title="Taille Points",Default=5,Min=2,Max=15,Rounding=0,Callback=function(v) radarOpt.PlayerSize=v end})
+TabRadar:AddDropdown("RadarPos",{Title="Position",Default="Bottom Right",Values={"Top Left","Top Right","Bottom Left","Bottom Right"},Callback=function(v) radarOpt.Position=v if radarGui then radarGui.bg.Position=getRadarPos() end end})
 TabRadar:AddToggle("RadarCustomColors",{Title="Couleurs Personnalisées",Default=false,Callback=function(v) radarOpt.CustomColors=v end})
 TabRadar:AddColorpicker("RadarTeamColor",{Title="Couleur Équipe",Default=Color3.fromRGB(60,255,120),Callback=function(v) radarOpt.TeamColor=v end})
 TabRadar:AddColorpicker("RadarEnemyColor",{Title="Couleur Ennemi",Default=Color3.fromRGB(255,60,60),Callback=function(v) radarOpt.EnemyColor=v end})
 TabRadar:AddColorpicker("RadarLocalColor",{Title="Couleur Joueur Local",Default=Color3.fromRGB(255,255,255),Callback=function(v) radarOpt.LocalColor=v buildRadar() end})
-TabRadar:AddColorpicker("RadarBgColor",{Title="Couleur Fond",Default=Color3.fromRGB(0,0,0),Callback=function(v) radarOpt.BgColor=v buildRadar() end})
-TabRadar:AddSlider("RadarBgTransp",{Title="Transparence Fond",Default=50,Min=0,Max=100,Rounding=0,Callback=function(v) radarOpt.BgTransp=v/100 buildRadar() end})
+TabRadar:AddColorpicker("RadarBgColor",{Title="Couleur Fond",Default=Color3.fromRGB(0,0,0),Callback=function(v) radarOpt.BgColor=v if radarGui then radarGui.bg.BackgroundColor3=v end end})
+TabRadar:AddSlider("RadarBgTransp",{Title="Transparence Fond",Default=50,Min=0,Max=100,Rounding=0,Callback=function(v) radarOpt.BgTransp=v/100 if radarGui then radarGui.bg.BackgroundTransparency=v/100 end end})
 
 -- ── Movement Tab ──────────────────────────────────────────────────
 local TabMov=Window:AddTab({Title="Movement",Icon="zap"})
@@ -1120,7 +1149,7 @@ TabMov:AddToggle("MovBhop",{Title="BunnyHop",Default=false,Callback=function(v) 
 TabMov:AddToggle("MovInfJump",{Title="Infinite Jump",Default=false,Callback=function(v) movOpt.InfJump=v applyInfJump() end})
 TabMov:AddToggle("MovJumpPower",{Title="Jump Power",Default=false,Callback=function(v) movOpt.JumpPower=v applyJumpPower() end})
 TabMov:AddSlider("MovJumpPowerVal",{Title="Jump Force",Default=50,Min=50,Max=500,Rounding=0,Callback=function(v) movOpt.JumpPowerVal=v end})
-TabMov:AddToggle("MovClickTP",{Title="Click TP (Clic Gauche)",Default=false,Callback=function(v) movOpt.ClickTP=v applyClickTP() end})
+TabMov:AddToggle("MovClickTP",{Title="Click TP (T ou Clic Gauche)",Default=false,Callback=function(v) movOpt.ClickTP=v applyClickTP() end})
 TabMov:AddToggle("MovFreeCamera",{Title="Free Camera (WASD + Shift sprint)",Default=false,Callback=function(v) movOpt.FreeCamera=v applyFreeCamera() end})
 TabMov:AddSlider("MovFreeCamSpeed",{Title="Free Cam Speed",Default=50,Min=5,Max=200,Rounding=0,Callback=function(v) movOpt.FreeCamSpeed=v end})
 TabMov:AddSlider("MovFreeCamSprint",{Title="Sprint Multiplier",Default=3,Min=1,Max=10,Rounding=0,Callback=function(v) movOpt.FreeCamSprintMult=v end})
