@@ -861,24 +861,24 @@ local function applyAntiAFK()
 end
 
 -- ── Third Person ──────────────────────────────────────────────────
-local origMaxZoom  = LP.CameraMaxZoomDistance
-local origMinZoom  = LP.CameraMinZoomDistance
-local origCamMode  = LP.CameraMode
 local function applyThirdPerson()
     miscClean("tp")
     if not miscOpt.ThirdPerson then
-        LP.CameraMode            = origCamMode
-        LP.CameraMaxZoomDistance = origMaxZoom
-        LP.CameraMinZoomDistance = origMinZoom
+        Camera.CameraType = Enum.CameraType.Custom
         return
     end
-    -- force chaque frame car Arsenal reset le zoom
-    miscConns["tp"] = RunService.Heartbeat:Connect(function()
+    -- Arsenal override le zoom donc on positionne la cam manuellement
+    Camera.CameraType = Enum.CameraType.Scriptable
+    miscConns["tp"] = RunService.RenderStepped:Connect(function()
         if not miscOpt.ThirdPerson then return end
-        LP.CameraMode            = Enum.CameraMode.Classic
-        LP.CameraMaxZoomDistance = miscOpt.TPDist
-        LP.CameraMinZoomDistance = miscOpt.TPDist
-        Camera.CameraType        = Enum.CameraType.Custom
+        local char = LP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local dist    = miscOpt.TPDist
+        local camCF   = Camera.CFrame
+        local lookVec = camCF.LookVector
+        local pos     = root.Position - lookVec * dist + Vector3.new(0, 2, 0)
+        Camera.CFrame = CFrame.new(pos, pos + lookVec)
     end)
 end
 
