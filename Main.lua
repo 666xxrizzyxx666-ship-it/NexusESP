@@ -753,5 +753,178 @@ TabMov:AddToggle("MovInfJump", {
     Callback=function(v) movOpt.InfJump=v applyInfJump() end,
 })
 
+
+-- ══════════════════════════════════════════════════════════════════
+-- MISC ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local miscOpt = {
+    InfAmmo      = false,
+    RapidFire    = false,
+    NoRecoil     = false,
+    Fullbright   = false,
+    NoFog        = false,
+    AntiAFK      = false,
+    ThirdPerson  = false,
+    TPDist       = 12,
+}
+
+local miscConns = {}
+local function miscClean(key)
+    if miscConns[key] then miscConns[key]:Disconnect() miscConns[key]=nil end
+end
+
+-- ── Infinite Ammo ─────────────────────────────────────────────────
+local function applyInfAmmo()
+    miscClean("ammo")
+    if not miscOpt.InfAmmo then return end
+    miscConns["ammo"] = RunService.Heartbeat:Connect(function()
+        if not miscOpt.InfAmmo then return end
+        local char = LP.Character
+        if not char then return end
+        local ammo = char:FindFirstChild("Ammo")
+            or char:FindFirstChild("PrimaryAmmo")
+            or char:FindFirstChild("PrimaryOUT")
+        if ammo and ammo:IsA("IntValue") then ammo.Value = 999 end
+    end)
+end
+
+-- ── Rapid Fire ────────────────────────────────────────────────────
+local function applyRapidFire()
+    miscClean("rapid")
+    if not miscOpt.RapidFire then return end
+    miscConns["rapid"] = RunService.Heartbeat:Connect(function()
+        if not miscOpt.RapidFire then return end
+        local char = LP.Character
+        if not char then return end
+        local cd = char:FindFirstChild("ShootingCooldown")
+            or char:FindFirstChild("Movetitude")
+        if cd and cd:IsA("NumberValue") then cd.Value = 0 end
+    end)
+end
+
+-- ── No Recoil ─────────────────────────────────────────────────────
+local origSensitivity = workspace.CurrentCamera.CFrame
+local function applyNoRecoil()
+    miscClean("recoil")
+    if not miscOpt.NoRecoil then return end
+    local lastCF = Camera.CFrame
+    miscConns["recoil"] = RunService.RenderStepped:Connect(function()
+        if not miscOpt.NoRecoil then return end
+        local cur = Camera.CFrame
+        -- Si la camera monte brutalement (recul) on la remet
+        local diff = math.abs(cur.LookVector.Y - lastCF.LookVector.Y)
+        if diff > 0.03 then
+            Camera.CFrame = CFrame.new(cur.Position) * CFrame.Angles(
+                math.asin(lastCF.LookVector.Y), math.atan2(-lastCF.LookVector.X, -lastCF.LookVector.Z), 0
+            )
+        end
+        lastCF = Camera.CFrame
+    end)
+end
+
+-- ── Fullbright ────────────────────────────────────────────────────
+local origAmbient    = game.Lighting.Ambient
+local origBrightness = game.Lighting.Brightness
+local function applyFullbright()
+    if miscOpt.Fullbright then
+        game.Lighting.Ambient    = Color3.fromRGB(255,255,255)
+        game.Lighting.Brightness = 2
+    else
+        game.Lighting.Ambient    = origAmbient
+        game.Lighting.Brightness = origBrightness
+    end
+end
+
+-- ── No Fog ────────────────────────────────────────────────────────
+local origFogEnd   = game.Lighting.FogEnd
+local origFogStart = game.Lighting.FogStart
+local function applyNoFog()
+    if miscOpt.NoFog then
+        game.Lighting.FogEnd   = 1e6
+        game.Lighting.FogStart = 1e6
+    else
+        game.Lighting.FogEnd   = origFogEnd
+        game.Lighting.FogStart = origFogStart
+    end
+end
+
+-- ── Anti-AFK ──────────────────────────────────────────────────────
+local function applyAntiAFK()
+    miscClean("afk")
+    if not miscOpt.AntiAFK then return end
+    miscConns["afk"] = RunService.Heartbeat:Connect(function()
+        if not miscOpt.AntiAFK then return end
+        local vchar = LP.Character
+        local hum   = vchar and vchar:FindFirstChildOfClass("Humanoid")
+        if hum then hum:Move(Vector3.new(0,0,0)) end
+    end)
+end
+
+-- ── Third Person ──────────────────────────────────────────────────
+local origMaxZoom = LP.CameraMaxZoomDistance
+local origMinZoom = LP.CameraMinZoomDistance
+local function applyThirdPerson()
+    if miscOpt.ThirdPerson then
+        LP.CameraMaxZoomDistance = miscOpt.TPDist
+        LP.CameraMinZoomDistance = miscOpt.TPDist
+    else
+        LP.CameraMaxZoomDistance = origMaxZoom
+        LP.CameraMinZoomDistance = origMinZoom
+    end
+end
+
+LP.CharacterAdded:Connect(function()
+    if miscOpt.InfAmmo    then task.wait(0.1) applyInfAmmo()   end
+    if miscOpt.RapidFire  then applyRapidFire() end
+    if miscOpt.NoRecoil   then applyNoRecoil()  end
+    if miscOpt.AntiAFK    then applyAntiAFK()   end
+end)
+
+-- ── Aim tab additions (weapon) ───────────────────────────────────
+TabAim:AddToggle("MiscInfAmmo", {
+    Title="Infinite Ammo", Default=false,
+    Callback=function(v) miscOpt.InfAmmo=v applyInfAmmo() end,
+})
+TabAim:AddParagraph({
+    Title="⚠ Infinite Ammo",
+    Content="Modifie les valeurs locales. Peut ne pas fonctionner si Arsenal vérifie côté serveur.",
+})
+TabAim:AddToggle("MiscRapidFire", {
+    Title="Rapid Fire", Default=false,
+    Callback=function(v) miscOpt.RapidFire=v applyRapidFire() end,
+})
+TabAim:AddToggle("MiscNoRecoil", {
+    Title="No Recoil", Default=false,
+    Callback=function(v) miscOpt.NoRecoil=v applyNoRecoil() end,
+})
+
+-- ── World tab ─────────────────────────────────────────────────────
+local TabWorld = Window:AddTab({ Title="World", Icon="sun" })
+
+TabWorld:AddToggle("MiscFullbright", {
+    Title="Fullbright", Default=false,
+    Callback=function(v) miscOpt.Fullbright=v applyFullbright() end,
+})
+TabWorld:AddToggle("MiscNoFog", {
+    Title="No Fog", Default=false,
+    Callback=function(v) miscOpt.NoFog=v applyNoFog() end,
+})
+TabWorld:AddToggle("MiscThirdPerson", {
+    Title="Third Person", Default=false,
+    Callback=function(v) miscOpt.ThirdPerson=v applyThirdPerson() end,
+})
+TabWorld:AddSlider("MiscTPDist", {
+    Title="Distance Caméra", Default=12, Min=5, Max=50, Rounding=0,
+    Callback=function(v) miscOpt.TPDist=v if miscOpt.ThirdPerson then applyThirdPerson() end end,
+})
+
+-- ── Misc tab ──────────────────────────────────────────────────────
+local TabMisc = Window:AddTab({ Title="Misc", Icon="settings" })
+
+TabMisc:AddToggle("MiscAntiAFK", {
+    Title="Anti-AFK", Default=false,
+    Callback=function(v) miscOpt.AntiAFK=v applyAntiAFK() end,
+})
+
 Window:SelectTab(1)
 print("[Aurora v"..VERSION.."] Chargé")
