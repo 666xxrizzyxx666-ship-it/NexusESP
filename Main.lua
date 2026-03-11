@@ -683,12 +683,15 @@ end
 local function applyBhop()
     movClean("bhop")
     if not movOpt.BunnyHop then return end
-    movConns["bhop"] = UIS2.JumpRequest:Connect(function()
+    movConns["bhop"] = RunService.Heartbeat:Connect(function()
         if not movOpt.BunnyHop then return end
         local char = LP.Character
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.FloorMaterial ~= Enum.Material.Air then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        if not hum then return end
+        if UIS2:IsKeyDown(Enum.KeyCode.Space) then
+            if hum.FloorMaterial ~= Enum.Material.Air then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
         end
     end)
 end
@@ -697,11 +700,14 @@ end
 local function applyInfJump()
     movClean("infjump")
     if not movOpt.InfJump then return end
-    movConns["infjump"] = UIS2.JumpRequest:Connect(function()
+    movConns["infjump"] = RunService.Heartbeat:Connect(function()
         if not movOpt.InfJump then return end
         local char = LP.Character
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        if not hum then return end
+        if UIS2:IsKeyDown(Enum.KeyCode.Space) then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
     end)
 end
 
