@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
---   Aurora v5.5.0 — Main.lua
+--   Nyx v1.0.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "6.2.5"
+local VERSION = "1.0.0"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -337,7 +337,7 @@ local function renderPlayer(player, d)
     end
 end
 
-RunService:BindToRenderStep("AuroraESP", Enum.RenderPriority.Camera.Value + 1, function()
+RunService:BindToRenderStep("NyxESP", Enum.RenderPriority.Camera.Value + 1, function()
     if not anyEnabled() then return end
     for player, d in pairs(playerData) do
         if not player or not player.Parent then
@@ -376,7 +376,7 @@ local Fluent = loadstring(game:HttpGet(
 ))()
 
 local Window = Fluent:CreateWindow({
-    Title       = "Aurora  •  v"..VERSION,
+    Title       = "Nyx  •  v"..VERSION,
     SubTitle    = "",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 400),
@@ -539,7 +539,7 @@ local function getBestTarget()
     return best
 end
 
-RunService:BindToRenderStep("AuroraAimbot", Enum.RenderPriority.Camera.Value + 2, function()
+RunService:BindToRenderStep("NyxAimbot", Enum.RenderPriority.Camera.Value + 2, function()
     renderFOV()
     if not aimbotOpt.Enabled then return end
 
@@ -1078,5 +1078,412 @@ TabMisc:AddToggle("MiscAntiAFK", {
     Callback=function(v) miscOpt.AntiAFK=v applyAntiAFK() end,
 })
 
+
+-- ══════════════════════════════════════════════════════════════════
+-- RADAR ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local radarOpt = {
+    Enabled         = false,
+    ShowNames       = false,
+    ShowDistance    = false,
+    ShowDot         = true,
+    ShowSelf        = true,
+    ShowDead        = false,
+    TeamCheck       = true,
+    RotateWithCam   = true,   -- radar tourne avec la caméra
+    FillDots        = true,   -- points remplis ou cercles
+    ShowBorder      = true,
+    ShowCross       = true,   -- croix centrale
+    ShowRange       = true,   -- cercle de portée
+    Size            = 200,
+    MaxDist         = 300,
+    DotSize         = 5,
+    Opacity         = 0.85,
+    Position        = "BottomRight",
+
+    -- Couleurs
+    ColBg           = Color3.fromRGB(10, 10, 15),
+    ColBorder       = Color3.fromRGB(160, 80, 200),
+    ColSelf         = Color3.fromRGB(100, 220, 255),
+    ColEnemy        = Color3.fromRGB(255, 60, 60),
+    ColTeam         = Color3.fromRGB(60, 220, 60),
+    ColCross        = Color3.fromRGB(80, 80, 100),
+    ColRange        = Color3.fromRGB(100, 50, 130),
+    ColText         = Color3.fromRGB(220, 220, 220),
+}
+
+local radarGui     = nil
+local radarFrame   = nil
+local radarCanvas  = nil
+local radarConns   = {}
+
+local function radarClean()
+    for _, c2 in pairs(radarConns) do
+        if typeof(c2) == "RBXScriptConnection" then c2:Disconnect() end
+    end
+    radarConns = {}
+    if radarGui then pcall(function() radarGui:Destroy() end) radarGui = nil end
+    radarFrame = nil radarCanvas = nil
+end
+
+local function hex(c2)
+    return string.format("#%02x%02x%02x",
+        math.floor(c2.R*255), math.floor(c2.G*255), math.floor(c2.B*255))
+end
+
+local function buildRadar()
+    radarClean()
+    if not radarOpt.Enabled then return end
+
+    local size = radarOpt.Size
+
+    -- Calcul position
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local posX, posY = 10, 10
+    local pos = radarOpt.Position
+    if pos == "TopRight"     then posX = screenSize.X - size - 10  posY = 10
+    elseif pos == "BottomLeft"  then posX = 10               posY = screenSize.Y - size - 10
+    elseif pos == "BottomRight" then posX = screenSize.X - size - 10  posY = screenSize.Y - size - 10
+    elseif pos == "TopLeft"     then posX = 10               posY = 10
+    elseif pos == "Center"      then posX = screenSize.X/2 - size/2  posY = screenSize.Y/2 - size/2
+    end
+
+    radarGui = Instance.new("ScreenGui")
+    radarGui.Name            = "NyxRadar"
+    radarGui.ResetOnSpawn    = false
+    radarGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+    radarGui.IgnoreGuiInset  = true
+    pcall(function() radarGui.Parent = game:GetService("CoreGui") end)
+
+    -- Fond principal
+    radarFrame = Instance.new("Frame")
+    radarFrame.Name            = "RadarFrame"
+    radarFrame.Size            = UDim2.fromOffset(size, size)
+    radarFrame.Position        = UDim2.fromOffset(posX, posY)
+    radarFrame.BackgroundColor3 = radarOpt.ColBg
+    radarFrame.BackgroundTransparency = 1 - radarOpt.Opacity
+    radarFrame.BorderSizePixel = 0
+    radarFrame.ClipsDescendants = true
+    radarFrame.Parent          = radarGui
+
+    -- Coin arrondi
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)  -- cercle parfait
+    corner.Parent = radarFrame
+
+    -- Bordure
+    if radarOpt.ShowBorder then
+        local stroke = Instance.new("UIStroke")
+        stroke.Color     = radarOpt.ColBorder
+        stroke.Thickness = 2
+        stroke.Parent    = radarFrame
+    end
+
+    -- Cercle de portée
+    if radarOpt.ShowRange then
+        local range = Instance.new("Frame")
+        range.Size = UDim2.new(0.7, 0, 0.7, 0)
+        range.Position = UDim2.new(0.15, 0, 0.15, 0)
+        range.BackgroundTransparency = 1
+        range.BorderSizePixel = 0
+        range.Parent = radarFrame
+        local rc = Instance.new("UICorner")
+        rc.CornerRadius = UDim.new(1, 0)
+        rc.Parent = range
+        local rs = Instance.new("UIStroke")
+        rs.Color     = radarOpt.ColRange
+        rs.Thickness = 1
+        rs.Transparency = 0.5
+        rs.Parent = range
+    end
+
+    -- Croix centrale
+    if radarOpt.ShowCross then
+        local hLine = Instance.new("Frame")
+        hLine.Size = UDim2.new(1, 0, 0, 1)
+        hLine.Position = UDim2.new(0, 0, 0.5, 0)
+        hLine.BackgroundColor3 = radarOpt.ColCross
+        hLine.BackgroundTransparency = 0.5
+        hLine.BorderSizePixel = 0
+        hLine.Parent = radarFrame
+
+        local vLine = Instance.new("Frame")
+        vLine.Size = UDim2.new(0, 1, 1, 0)
+        vLine.Position = UDim2.new(0.5, 0, 0, 0)
+        vLine.BackgroundColor3 = radarOpt.ColCross
+        vLine.BackgroundTransparency = 0.5
+        vLine.BorderSizePixel = 0
+        vLine.Parent = radarFrame
+    end
+
+    -- Point joueur local (centre)
+    if radarOpt.ShowSelf then
+        local selfDot = Instance.new("Frame")
+        selfDot.Name = "SelfDot"
+        selfDot.Size = UDim2.fromOffset(radarOpt.DotSize + 2, radarOpt.DotSize + 2)
+        selfDot.AnchorPoint = Vector2.new(0.5, 0.5)
+        selfDot.Position = UDim2.new(0.5, 0, 0.5, 0)
+        selfDot.BackgroundColor3 = radarOpt.ColSelf
+        selfDot.BorderSizePixel = 0
+        selfDot.ZIndex = 5
+        selfDot.Parent = radarFrame
+        local dc = Instance.new("UICorner")
+        dc.CornerRadius = UDim.new(1, 0)
+        dc.Parent = selfDot
+
+        -- Triangle directionnel (flèche)
+        local arrow = Instance.new("Frame")
+        arrow.Name = "Arrow"
+        arrow.Size = UDim2.fromOffset(8, 8)
+        arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+        arrow.Position = UDim2.new(0.5, 0, 0.5, -10)
+        arrow.BackgroundColor3 = radarOpt.ColSelf
+        arrow.BorderSizePixel = 0
+        arrow.Rotation = 45
+        arrow.ZIndex = 5
+        arrow.Parent = radarFrame
+    end
+
+    -- Canvas pour les blips joueurs
+    radarCanvas = Instance.new("Frame")
+    radarCanvas.Name = "Canvas"
+    radarCanvas.Size = UDim2.new(1, 0, 1, 0)
+    radarCanvas.BackgroundTransparency = 1
+    radarCanvas.BorderSizePixel = 0
+    radarCanvas.ZIndex = 3
+    radarCanvas.Parent = radarFrame
+
+    -- Label "NYX" en haut du radar
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 14)
+    label.Position = UDim2.new(0, 0, 0, 4)
+    label.BackgroundTransparency = 1
+    label.Text = "NYX"
+    label.TextColor3 = radarOpt.ColBorder
+    label.TextSize = 10
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.ZIndex = 6
+    label.Parent = radarFrame
+end
+
+-- Pool de blips réutilisables
+local blipPool = {}
+local function getBlip()
+    for _, b in ipairs(blipPool) do
+        if not b.InUse then
+            b.InUse = true
+            b.Frame.Visible = true
+            return b
+        end
+    end
+    -- Créer nouveau blip
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    f.BorderSizePixel  = 0
+    f.ZIndex           = 4
+    local c2 = Instance.new("UICorner")
+    c2.CornerRadius = UDim.new(1, 0)
+    c2.Parent = f
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Name = "Label"
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3  = Color3.fromRGB(220, 220, 220)
+    lbl.TextSize    = 9
+    lbl.Font        = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex      = 5
+    lbl.Size        = UDim2.fromOffset(80, 14)
+    lbl.Text        = ""
+    lbl.Parent      = f
+
+    local blip = { Frame = f, Label = lbl, InUse = true }
+    table.insert(blipPool, blip)
+    return blip
+end
+
+local function releaseAllBlips()
+    for _, b in ipairs(blipPool) do
+        b.InUse = false
+        b.Frame.Visible = false
+        b.Frame.Parent  = nil
+    end
+end
+
+-- Mise à jour radar chaque frame
+local function updateRadar()
+    if not radarOpt.Enabled or not radarFrame or not radarCanvas then return end
+
+    local LP2     = game.Players.LocalPlayer
+    local char2   = LP2 and LP2.Character
+    local root2   = char2 and char2:FindFirstChild("HumanoidRootPart")
+    if not root2 then return end
+
+    local cam2    = workspace.CurrentCamera
+    local camCF   = cam2.CFrame
+    local size    = radarOpt.Size
+    local maxDist = radarOpt.MaxDist
+    local dotSize = radarOpt.DotSize
+
+    -- Direction caméra pour rotation
+    local camYaw = 0
+    if radarOpt.RotateWithCam then
+        local _, camY, _ = camCF:ToEulerAnglesYXZ()
+        camYaw = camY
+    end
+
+    releaseAllBlips()
+
+    -- Mise à jour flèche direction
+    local arrow = radarFrame:FindFirstChild("Arrow")
+    if arrow and radarOpt.RotateWithCam then
+        arrow.Rotation = math.deg(-camYaw)
+    end
+
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player == LP2 then continue end
+
+        local pChar = player.Character
+        local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+        if not pRoot then continue end
+
+        local pHum = pChar:FindFirstChildOfClass("Humanoid")
+        local isAlive2 = pHum and pHum.Health > 0
+        if not isAlive2 and not radarOpt.ShowDead then continue end
+
+        -- Team check
+        local sameTeam2 = false
+        pcall(function()
+            sameTeam2 = player.Team ~= nil and player.Team == LP2.Team
+        end)
+        if radarOpt.TeamCheck and sameTeam2 then continue end
+
+        -- Delta position
+        local delta = pRoot.Position - root2.Position
+        local dist2 = math.sqrt(delta.X^2 + delta.Z^2)
+        if dist2 > maxDist then continue end
+
+        -- Rotation par rapport à la caméra
+        local angle = math.atan2(delta.X, delta.Z) + camYaw
+        local normDist = (dist2 / maxDist) * 0.45  -- 0 à 0.45 (rayon)
+
+        local rx = 0.5 + math.sin(angle) * normDist
+        local ry = 0.5 - math.cos(angle) * normDist  -- Y inversé
+
+        -- Clamp dans le radar
+        rx = math.clamp(rx, 0.02, 0.98)
+        ry = math.clamp(ry, 0.02, 0.98)
+
+        local blip = getBlip()
+        local col2 = sameTeam2 and radarOpt.ColTeam or radarOpt.ColEnemy
+        if not isAlive2 then col2 = Color3.fromRGB(100, 100, 100) end
+
+        blip.Frame.Size             = UDim2.fromOffset(dotSize, dotSize)
+        blip.Frame.AnchorPoint      = Vector2.new(0.5, 0.5)
+        blip.Frame.Position         = UDim2.new(rx, 0, ry, 0)
+        blip.Frame.BackgroundColor3 = col2
+        blip.Frame.BackgroundTransparency = radarOpt.FillDots and 0 or 0.3
+        blip.Frame.Parent           = radarCanvas
+
+        -- Label nom/distance
+        local labelText = ""
+        if radarOpt.ShowNames then
+            labelText = player.DisplayName
+        end
+        if radarOpt.ShowDistance then
+            local d3D = (pRoot.Position - root2.Position).Magnitude
+            local dStr = string.format("%.0f", d3D)
+            labelText = labelText ~= "" and (labelText.." "..dStr) or dStr
+        end
+        blip.Label.Text = labelText
+        blip.Label.TextColor3 = radarOpt.ColText
+        blip.Label.Position = UDim2.fromOffset(dotSize + 2, -4)
+    end
+end
+
+-- Loop radar
+local radarLoop = nil
+local function startRadarLoop()
+    if radarLoop then radarLoop:Disconnect() radarLoop = nil end
+    if not radarOpt.Enabled then return end
+    radarLoop = RunService.RenderStepped:Connect(function()
+        pcall(updateRadar)
+    end)
+end
+
+-- ── Radar UI ───────────────────────────────────────────────────────────────────
+local TabRadar = Window:AddTab({ Title="Radar", Icon="map" })
+
+TabRadar:AddToggle("RadarEnabled", {
+    Title="Radar", Default=false,
+    Callback=function(v)
+        radarOpt.Enabled = v
+        buildRadar()
+        startRadarLoop()
+    end,
+})
+TabRadar:AddToggle("RadarTeamCheck", {
+    Title="Team Check", Default=true,
+    Callback=function(v) radarOpt.TeamCheck=v end,
+})
+TabRadar:AddToggle("RadarShowNames", {
+    Title="Afficher Noms", Default=false,
+    Callback=function(v) radarOpt.ShowNames=v end,
+})
+TabRadar:AddToggle("RadarShowDist", {
+    Title="Afficher Distance", Default=false,
+    Callback=function(v) radarOpt.ShowDistance=v end,
+})
+TabRadar:AddToggle("RadarShowDead", {
+    Title="Afficher Morts", Default=false,
+    Callback=function(v) radarOpt.ShowDead=v end,
+})
+TabRadar:AddToggle("RadarRotate", {
+    Title="Rotation Caméra", Default=true,
+    Callback=function(v) radarOpt.RotateWithCam=v end,
+})
+TabRadar:AddToggle("RadarFillDots", {
+    Title="Points Remplis", Default=true,
+    Callback=function(v) radarOpt.FillDots=v end,
+})
+TabRadar:AddToggle("RadarShowSelf", {
+    Title="Afficher Soi-même", Default=true,
+    Callback=function(v) radarOpt.ShowSelf=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddToggle("RadarShowBorder", {
+    Title="Bordure", Default=true,
+    Callback=function(v) radarOpt.ShowBorder=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddToggle("RadarShowCross", {
+    Title="Croix Centrale", Default=true,
+    Callback=function(v) radarOpt.ShowCross=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddToggle("RadarShowRange", {
+    Title="Cercle de Portée", Default=true,
+    Callback=function(v) radarOpt.ShowRange=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddDropdown("RadarPosition", {
+    Title="Position", Default="BottomRight",
+    Values={"TopLeft","TopRight","BottomLeft","BottomRight","Center"},
+    Callback=function(v) radarOpt.Position=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddSlider("RadarSize", {
+    Title="Taille", Default=200, Min=100, Max=400, Rounding=0,
+    Callback=function(v) radarOpt.Size=v buildRadar() startRadarLoop() end,
+})
+TabRadar:AddSlider("RadarMaxDist", {
+    Title="Distance Max", Default=300, Min=50, Max=1000, Rounding=0,
+    Callback=function(v) radarOpt.MaxDist=v end,
+})
+TabRadar:AddSlider("RadarDotSize", {
+    Title="Taille des Points", Default=5, Min=2, Max=14, Rounding=0,
+    Callback=function(v) radarOpt.DotSize=v end,
+})
+TabRadar:AddSlider("RadarOpacity", {
+    Title="Opacité", Default=85, Min=10, Max=100, Rounding=0,
+    Callback=function(v) radarOpt.Opacity=v/100 buildRadar() startRadarLoop() end,
+})
+
 Window:SelectTab(1)
-print("[Aurora v"..VERSION.."] Chargé")
+print("[Nyx v"..VERSION.."] Chargé")
