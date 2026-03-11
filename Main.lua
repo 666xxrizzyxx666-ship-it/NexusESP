@@ -861,15 +861,20 @@ local function applyAntiAFK()
 end
 
 -- ── Third Person ──────────────────────────────────────────────────
-local origMaxZoom = LP.CameraMaxZoomDistance
-local origMinZoom = LP.CameraMinZoomDistance
+local origMaxZoom  = LP.CameraMaxZoomDistance
+local origMinZoom  = LP.CameraMinZoomDistance
+local origCamMode  = LP.CameraMode
 local function applyThirdPerson()
     if miscOpt.ThirdPerson then
+        LP.CameraMode            = Enum.CameraMode.Classic
         LP.CameraMaxZoomDistance = miscOpt.TPDist
         LP.CameraMinZoomDistance = miscOpt.TPDist
+        Camera.CameraType        = Enum.CameraType.Custom
     else
+        LP.CameraMode            = origCamMode
         LP.CameraMaxZoomDistance = origMaxZoom
         LP.CameraMinZoomDistance = origMinZoom
+        Camera.CameraType        = Enum.CameraType.Custom
     end
 end
 
