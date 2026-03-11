@@ -570,7 +570,7 @@ TabAim:AddParagraph({
     Content = "Touche par défaut : Hold Clic Droit. Le choix de touche sera disponible dans l'UI finale.",
 })
 TabAim:AddSlider("AimFOV", {
-    Title="FOV", Default=120, Min=10, Max=500, Rounding=0,
+    Title="Rayon de visée (FOV Circle)", Default=120, Min=10, Max=500, Rounding=0,
     Callback=function(v) aimbotOpt.FOV=v end,
 })
 TabAim:AddSlider("AimSmooth", {
@@ -865,17 +865,21 @@ local origMaxZoom  = LP.CameraMaxZoomDistance
 local origMinZoom  = LP.CameraMinZoomDistance
 local origCamMode  = LP.CameraMode
 local function applyThirdPerson()
-    if miscOpt.ThirdPerson then
+    miscClean("tp")
+    if not miscOpt.ThirdPerson then
+        LP.CameraMode            = origCamMode
+        LP.CameraMaxZoomDistance = origMaxZoom
+        LP.CameraMinZoomDistance = origMinZoom
+        return
+    end
+    -- force chaque frame car Arsenal reset le zoom
+    miscConns["tp"] = RunService.Heartbeat:Connect(function()
+        if not miscOpt.ThirdPerson then return end
         LP.CameraMode            = Enum.CameraMode.Classic
         LP.CameraMaxZoomDistance = miscOpt.TPDist
         LP.CameraMinZoomDistance = miscOpt.TPDist
         Camera.CameraType        = Enum.CameraType.Custom
-    else
-        LP.CameraMode            = origCamMode
-        LP.CameraMaxZoomDistance = origMaxZoom
-        LP.CameraMinZoomDistance = origMinZoom
-        Camera.CameraType        = Enum.CameraType.Custom
-    end
+    end)
 end
 
 LP.CharacterAdded:Connect(function()
