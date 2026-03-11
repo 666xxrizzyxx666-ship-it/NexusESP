@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 --   Aurora v5.5.0 — Main.lua
 -- ══════════════════════════════════════════════════════════════════
-local VERSION = "6.0.1"
+local VERSION = "6.0.2"
 
 -- Détection jeu
 local PLACE_ID     = game.PlaceId
@@ -559,7 +559,7 @@ RunService:BindToRenderStep("AuroraAimbot", Enum.RenderPriority.Camera.Value + 2
 end)
 
 -- ── Aimbot UI ─────────────────────────────────────────────────────
-local TabAim = Window:AddTab({ Title="Aimbot", Icon="crosshair" })
+local TabAim = Window:AddTab({ Title="Aim", Icon="crosshair" })
 
 TabAim:AddToggle("AimEnabled", {
     Title="Aimbot", Default=false,
@@ -584,6 +584,167 @@ TabAim:AddDropdown("AimBone", {
 TabAim:AddToggle("AimTeamCheck", {
     Title="Team Check", Default=true,
     Callback=function(v) aimbotOpt.TeamCheck=v end,
+})
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- MOVEMENT ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local movOpt = {
+    Speed      = false,
+    SpeedVal   = 24,
+    Fly        = false,
+    FlySpeed   = 50,
+    Noclip     = false,
+    BunnyHop   = false,
+    InfJump    = false,
+}
+
+local UIS2     = game:GetService("UserInputService")
+local movConns = {}
+
+local function movClean(key)
+    if movConns[key] then
+        movConns[key]:Disconnect()
+        movConns[key] = nil
+    end
+end
+
+-- ── Speed ─────────────────────────────────────────────────────────
+local function applySpeed()
+    movClean("speed")
+    if not movOpt.Speed then
+        local char = LP.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+        return
+    end
+    movConns["speed"] = RunService.Heartbeat:Connect(function()
+        local char = LP.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = movOpt.SpeedVal end
+    end)
+end
+
+-- ── Fly ───────────────────────────────────────────────────────────
+local flyBody = nil
+local function applyFly()
+    movClean("fly")
+    -- cleanup
+    if flyBody then flyBody:Destroy() flyBody = nil end
+    if not movOpt.Fly then return end
+
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(4e5, 4e5, 4e5)
+    bg.P = 1e4 bg.Parent = root
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.Velocity = Vector3.zero
+    bv.Parent = root
+    flyBody = bv
+
+    movConns["fly"] = RunService.Heartbeat:Connect(function()
+        if not movOpt.Fly then return end
+        local cf  = Camera.CFrame
+        local vel = Vector3.zero
+        if UIS2:IsKeyDown(Enum.KeyCode.W) then vel = vel + cf.LookVector end
+        if UIS2:IsKeyDown(Enum.KeyCode.S) then vel = vel - cf.LookVector end
+        if UIS2:IsKeyDown(Enum.KeyCode.A) then vel = vel - cf.RightVector end
+        if UIS2:IsKeyDown(Enum.KeyCode.D) then vel = vel + cf.RightVector end
+        if UIS2:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0,1,0) end
+        if UIS2:IsKeyDown(Enum.KeyCode.LeftControl) then vel = vel - Vector3.new(0,1,0) end
+        bv.Velocity = vel * movOpt.FlySpeed
+        bg.CFrame   = cf
+    end)
+end
+
+-- ── Noclip ────────────────────────────────────────────────────────
+local function applyNoclip()
+    movClean("noclip")
+    if not movOpt.Noclip then return end
+    movConns["noclip"] = RunService.Stepped:Connect(function()
+        if not movOpt.Noclip then return end
+        local char = LP.Character
+        if not char then return end
+        for _, p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.CanCollide = false
+            end
+        end
+    end)
+end
+
+-- ── BunnyHop ──────────────────────────────────────────────────────
+local function applyBhop()
+    movClean("bhop")
+    if not movOpt.BunnyHop then return end
+    movConns["bhop"] = UIS2.JumpRequest:Connect(function()
+        if not movOpt.BunnyHop then return end
+        local char = LP.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.FloorMaterial ~= Enum.Material.Air then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+end
+
+-- ── InfJump ───────────────────────────────────────────────────────
+local function applyInfJump()
+    movClean("infjump")
+    if not movOpt.InfJump then return end
+    movConns["infjump"] = UIS2.JumpRequest:Connect(function()
+        if not movOpt.InfJump then return end
+        local char = LP.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end)
+end
+
+-- cleanup on respawn
+LP.CharacterAdded:Connect(function()
+    flyBody = nil
+    if movOpt.Fly   then task.wait(0.1) applyFly()   end
+    if movOpt.Speed then applySpeed() end
+    if movOpt.Noclip then applyNoclip() end
+    if movOpt.BunnyHop then applyBhop() end
+    if movOpt.InfJump then applyInfJump() end
+end)
+
+-- ── Movement UI ───────────────────────────────────────────────────
+local TabMov = Window:AddTab({ Title="Movement", Icon="zap" })
+
+TabMov:AddToggle("MovSpeed", {
+    Title="Speed", Default=false,
+    Callback=function(v) movOpt.Speed=v applySpeed() end,
+})
+TabMov:AddSlider("MovSpeedVal", {
+    Title="Walk Speed", Default=24, Min=16, Max=150, Rounding=0,
+    Callback=function(v) movOpt.SpeedVal=v end,
+})
+TabMov:AddToggle("MovFly", {
+    Title="Fly  (WASD + Space/Ctrl)", Default=false,
+    Callback=function(v) movOpt.Fly=v applyFly() end,
+})
+TabMov:AddSlider("MovFlySpeed", {
+    Title="Fly Speed", Default=50, Min=10, Max=300, Rounding=0,
+    Callback=function(v) movOpt.FlySpeed=v end,
+})
+TabMov:AddToggle("MovNoclip", {
+    Title="Noclip", Default=false,
+    Callback=function(v) movOpt.Noclip=v applyNoclip() end,
+})
+TabMov:AddToggle("MovBhop", {
+    Title="BunnyHop", Default=false,
+    Callback=function(v) movOpt.BunnyHop=v applyBhop() end,
+})
+TabMov:AddToggle("MovInfJump", {
+    Title="Infinite Jump", Default=false,
+    Callback=function(v) movOpt.InfJump=v applyInfJump() end,
 })
 
 Window:SelectTab(1)
